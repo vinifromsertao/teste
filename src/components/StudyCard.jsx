@@ -5,13 +5,37 @@ export function StudyCard({ card, isFlipped, onFlip, progress, total }) {
     return null;
   }
 
+  const handleKeyDown = (event) => {
+    const isSpace = event.key === " " || event.key === "Spacebar" || event.code === "Space";
+    const isEnter = event.key === "Enter";
+
+    if (!isSpace && !isEnter) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    onFlip();
+  };
+
+  const handleClick = (event) => {
+    if (event.detail === 0) {
+      return;
+    }
+
+    onFlip();
+  };
+
   return (
     <div className="card-viewport">
       <motion.button
         animate={{ opacity: 1, y: 0 }}
+        aria-label={`Flashcard ${card.front}`}
+        aria-pressed={isFlipped}
         className={`card-3d outline-focus relative h-[29rem] w-full rounded-[36px] border border-[var(--border-soft)] text-left ${isFlipped ? "is-flipped" : ""}`}
         initial={{ opacity: 0, y: 20 }}
-        onClick={onFlip}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
         style={{ background: "transparent" }}
         transition={{ duration: 0.35 }}
         type="button"
