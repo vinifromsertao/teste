@@ -184,7 +184,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                 </div>
               </div>
 
-              <label className="grid gap-2">
+                            <label className="grid gap-2">
                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
                   Frente
                 </span>
@@ -224,6 +224,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                   value={form.hint}
                 />
               </label>
+
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
