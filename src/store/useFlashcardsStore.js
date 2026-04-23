@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { defaultCards } from "../utils/defaultDeck";
+import { defaultThemeStyles, getThemeColorId } from "../utils/colorThemes";
 import { applyRatingToCard, buildStudyQueue, scheduleReviewedCard } from "../utils/spacedRepetition";
 
 function normalizeCardInput(input) {
   return {
     id: input.id ?? crypto.randomUUID(),
     theme: input.theme,
+    colorId: input.colorId ?? getThemeColorId(input.theme, defaultThemeStyles),
     label: input.label.trim(),
     front: input.front.trim(),
     back: input.back.trim(),
@@ -31,6 +33,7 @@ export const useFlashcardsStore = create(
         theme: "Todos",
         search: "",
       },
+      themeStyles: defaultThemeStyles,
       session: {
         queue: [],
         currentIndex: 0,
@@ -42,14 +45,30 @@ export const useFlashcardsStore = create(
       addCard: (payload) =>
         set((state) => ({
           cards: [normalizeCardInput(payload), ...state.cards],
+          themeStyles: {
+            ...state.themeStyles,
+            [payload.theme]: payload.colorId ?? getThemeColorId(payload.theme, state.themeStyles),
+          },
         })),
 
       updateCard: (cardId, payload) =>
-        set((state) => ({
-          cards: state.cards.map((card) =>
-            card.id === cardId ? normalizeCardInput({ ...card, ...payload, id: cardId }) : card,
-          ),
-        })),
+        set((state) => {
+          const currentCard = state.cards.find((card) => card.id === cardId);
+          const nextTheme = payload.theme ?? currentCard?.theme ?? "Figuras de linguagem";
+          const nextColorId = payload.colorId ?? currentCard?.colorId ?? getThemeColorId(nextTheme, state.themeStyles);
+
+          return {
+            cards: state.cards.map((card) =>
+              card.id === cardId
+                ? normalizeCardInput({ ...card, ...payload, id: cardId, theme: nextTheme, colorId: nextColorId })
+                : card,
+            ),
+            themeStyles: {
+              ...state.themeStyles,
+              [nextTheme]: nextColorId,
+            },
+          };
+        }),
 
       deleteCard: (cardId) =>
         set((state) => ({
@@ -148,6 +167,7 @@ export const useFlashcardsStore = create(
       partialize: (state) => ({
         cards: state.cards,
         filters: state.filters,
+        themeStyles: state.themeStyles,
       }),
     },
   ),
