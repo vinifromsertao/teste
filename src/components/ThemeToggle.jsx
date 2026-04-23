@@ -9,7 +9,7 @@ export function ThemeToggle() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
-            Aparencia
+            Aparência
           </p>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Segue o sistema ou escolha o clima do estudo.
