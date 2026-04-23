@@ -42,7 +42,8 @@ export function StudyCard({ card, isFlipped, onFlip, progress, total }) {
           style={{ background: "transparent" }}
           type="button"
         >
-          <div className="card-face absolute inset-0 soft-card rounded-[36px] p-6 sm:p-8">
+          <div className="card-face front absolute inset-0 soft-card rounded-[36px] p-6 sm:p-8">
+
             <div className="flex h-full flex-col">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
