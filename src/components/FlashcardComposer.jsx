@@ -41,6 +41,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
 
   const handleSubmit = (event) => {
     event.preventDefault();
+
     if (isRichTextEmpty(form.back)) {
       return;
     }
@@ -123,21 +124,19 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                   </select>
                 </label>
 
-               <div className="grid gap-2">
-  <div className="flex items-center justify-between gap-3">
-    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-      Verso
-    </span>
-    <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-      Editor rico
-    </span>
-  </div>
-  <RichTextEditor
-    onChange={(nextBack) => setForm((state) => ({ ...state, back: nextBack }))}
-    value={form.back}
-  />
-</div>
-
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Categoria curta
+                  </span>
+                  <input
+                    className="outline-focus rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)]"
+                    onChange={(event) => setForm((state) => ({ ...state, label: event.target.value }))}
+                    placeholder="Ex.: Figuras de som"
+                    required
+                    value={form.label}
+                  />
+                </label>
+              </div>
 
               <div className="grid gap-3">
                 <div>
@@ -152,6 +151,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {colorOptions.map((option) => {
                     const active = form.colorId === option.id;
+
                     return (
                       <button
                         className={`outline-focus rounded-[22px] border p-3 text-left transition ${
@@ -197,7 +197,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                 />
               </label>
 
-              <label className="grid gap-2">
+              <div className="grid gap-2">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
                     Verso
@@ -206,11 +206,12 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                     Editor rico
                   </span>
                 </div>
+
                 <RichTextEditor
                   onChange={(nextBack) => setForm((state) => ({ ...state, back: nextBack }))}
                   value={form.back}
                 />
-              </label>
+              </div>
 
               <label className="grid gap-2">
                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
