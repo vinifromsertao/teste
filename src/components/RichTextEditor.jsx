@@ -171,28 +171,33 @@ export function RichTextEditor({ value, onChange }) {
         </div>
       </div>
 
-      <div
-        className={`rounded-[28px] border bg-[var(--bg-card)] px-4 py-4 shadow-[var(--shadow-card)] transition ${
-          isFocused ? "border-[var(--accent)]" : "border-[var(--border-soft)]"
-        }`}
-      >
-        <div
-          ref={editorRef}
-          className="rich-text-editor min-h-40 text-[var(--text-primary)] focus:outline-none"
-          contentEditable
-          onBlur={() => {
-            setIsFocused(false);
-            syncFromEditor();
-          }}
-          onFocus={() => setIsFocused(true)}
-          onInput={syncFromEditor}
-          style={{
-            fontSize: `${fontSize}px`,
-            textAlign,
-          }}
-          suppressContentEditableWarning
-        />
-      </div>
+     <div
+  className={`rounded-[28px] border bg-[var(--bg-card)] px-4 py-4 shadow-[var(--shadow-card)] transition ${
+    isFocused ? "border-[var(--accent)]" : "border-[var(--border-soft)]"
+  }`}
+  onClick={() => editorRef.current?.focus()}
+>
+  <div
+    ref={editorRef}
+    className="rich-text-editor min-h-40 text-[var(--text-primary)] focus:outline-none"
+    contentEditable
+    onBlur={() => {
+      setIsFocused(false);
+      syncFromEditor();
+    }}
+    onFocus={() => setIsFocused(true)}
+    onInput={syncFromEditor}
+    style={{
+      fontSize: `${fontSize}px`,
+      textAlign,
+    }}
+    tabIndex={0}
+    role="textbox"
+    aria-multiline="true"
+    suppressContentEditableWarning
+  />
+</div>
+
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
         <span>Tamanho atual: {fontSize}px</span>
