@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { getThemeLabel } from "../utils/defaultDeck";
 
 export function StudyCard({ card, isFlipped, onFlip, progress, total }) {
   if (!card) {
@@ -64,7 +65,7 @@ export function StudyCard({ card, isFlipped, onFlip, progress, total }) {
 
               <div className="space-y-2 text-center">
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Clique ou pressione <span className="font-semibold">espaco</span> para revelar.
+                  Clique ou pressione <span className="font-semibold">espaço</span> para revelar.
                 </p>
                 {card.hint ? (
                   <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-muted)]">
@@ -80,7 +81,7 @@ export function StudyCard({ card, isFlipped, onFlip, progress, total }) {
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
                   <div className="inline-flex rounded-full bg-[var(--bg-elevated)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--accent)]">
-                    {card.theme}
+                    {getThemeLabel(card.theme)}
                   </div>
                   <p className="text-sm uppercase tracking-[0.28em] text-[var(--text-muted)]">verso</p>
                 </div>
@@ -99,7 +100,7 @@ export function StudyCard({ card, isFlipped, onFlip, progress, total }) {
               </div>
 
               <p className="mt-6 text-center text-sm text-[var(--text-secondary)]">
-                Avalie o quanto esse conteudo ja esta fixo para ajustar a repeticao.
+                Avalie o quanto esse conteúdo já está fixo para ajustar a repetição.
               </p>
             </div>
           </div>
