@@ -39,4 +39,3 @@ export function useKeyboardShortcuts(bindings) {
     return () => window.removeEventListener("keydown", listener);
   }, [bindings]);
 }
-
