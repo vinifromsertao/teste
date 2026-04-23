@@ -1,5 +1,18 @@
 import { useEffect } from "react";
 
+function getBindingHandler(bindings, event) {
+  const directHandler = bindings[event.key];
+  if (directHandler) {
+    return directHandler;
+  }
+
+  if (event.code === "Space") {
+    return bindings[" "] ?? bindings.Space ?? bindings.Spacebar;
+  }
+
+  return undefined;
+}
+
 export function useKeyboardShortcuts(bindings) {
   useEffect(() => {
     const listener = (event) => {
@@ -14,8 +27,7 @@ export function useKeyboardShortcuts(bindings) {
         return;
       }
 
-      const key = event.key;
-      const handler = bindings[key];
+      const handler = getBindingHandler(bindings, event);
 
       if (handler) {
         event.preventDefault();
@@ -27,3 +39,4 @@ export function useKeyboardShortcuts(bindings) {
     return () => window.removeEventListener("keydown", listener);
   }, [bindings]);
 }
+
