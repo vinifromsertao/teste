@@ -1,0 +1,120 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+@import "./styles/theme.css";
+
+@theme inline {
+  --font-display: var(--font-display);
+  --font-sans: var(--font-ui);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  background:
+    radial-gradient(circle at top left, rgba(210, 158, 118, 0.22), transparent 32%),
+    radial-gradient(circle at top right, rgba(85, 55, 38, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26), transparent 44%),
+    var(--bg-primary);
+  transition:
+    background-color 240ms ease,
+    color 240ms ease,
+    background 240ms ease;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 92px 92px;
+  opacity: 0.2;
+  pointer-events: none;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.glass-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-soft);
+  backdrop-filter: var(--surface-blur);
+  box-shadow: var(--shadow-soft);
+}
+
+.soft-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: var(--surface-blur);
+}
+
+.hairline {
+  border-color: var(--border-soft);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.bg-elevated {
+  background: var(--bg-elevated);
+}
+
+.bg-accent-soft {
+  background: var(--accent-soft);
+}
+
+.outline-focus:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.card-viewport {
+  perspective: 1800px;
+}
+
+.card-3d {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.card-3d.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.card-face.back {
+  transform: rotateY(180deg);
+}
+
+.scrollbar-soft::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scrollbar-soft::-webkit-scrollbar-thumb {
+  background: rgba(129, 96, 72, 0.2);
+  border-radius: 999px;
+}
