@@ -135,3 +135,35 @@ body::before {
   background: rgba(129, 96, 72, 0.2);
   border-radius: 999px;
 }
+
+.rich-text-editor {
+  line-height: 1.8;
+}
+
+.rich-text-editor:empty::before {
+  content: "Definição, exemplo, observação ou explicação com destaque visual.";
+  color: var(--text-muted);
+}
+
+.rich-text-editor p {
+  margin: 0 0 1rem;
+}
+
+.rich-text-editor p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-output p {
+  margin: 0 0 1rem;
+}
+
+.rich-text-output p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-output mark,
+.rich-text-editor mark {
+  padding: 0.08em 0.24em;
+  border-radius: 0.35em;
+}
+
