@@ -1,5 +1,6 @@
 import { BookOpenText, ChevronRight } from "lucide-react";
 import { colorOptions, getStripedCardBackground, getThemeVisual } from "../utils/colorThemes";
+import { getThemeLabel } from "../utils/defaultDeck";
 
 export function SubjectSidebar({ themes, activeTheme, onSelectTheme, cards, themeStyles }) {
   return (
@@ -9,7 +10,7 @@ export function SubjectSidebar({ themes, activeTheme, onSelectTheme, cards, them
           Assuntos
         </p>
         <h3 className="mt-2 font-display text-3xl tracking-[-0.04em] text-[var(--text-primary)]">
-          Escolha o foco da revisao.
+          Escolha o foco da revisão.
         </h3>
       </div>
 
@@ -43,18 +44,27 @@ export function SubjectSidebar({ themes, activeTheme, onSelectTheme, cards, them
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/16 backdrop-blur-sm">
+                  <div
+                    className="flex h-11 w-11 items-center justify-center rounded-2xl backdrop-blur-sm"
+                    style={{ background: visual.chipBg }}
+                  >
                     <BookOpenText size={18} />
                   </div>
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">
+                    <p
+                      className="text-[11px] font-semibold uppercase tracking-[0.24em]"
+                      style={{ color: visual.mutedText }}
+                    >
                       {themeCards.length} cards
                     </p>
-                    <p className="mt-1 text-base font-semibold">{theme}</p>
+                    <p className="mt-1 text-base font-semibold">{getThemeLabel(theme)}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
+                <div
+                  className="flex items-center gap-2 text-sm font-semibold"
+                  style={{ color: visual.mutedText }}
+                >
                   {selected ? "Ativo" : "Abrir"}
                   <ChevronRight size={16} />
                 </div>
