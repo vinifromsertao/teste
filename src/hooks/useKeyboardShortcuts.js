@@ -31,11 +31,12 @@ export function useKeyboardShortcuts(bindings) {
 
       if (handler) {
         event.preventDefault();
+        event.stopPropagation();
         handler(event);
       }
     };
 
-    window.addEventListener("keydown", listener);
-    return () => window.removeEventListener("keydown", listener);
+    document.addEventListener("keydown", listener, true);
+    return () => document.removeEventListener("keydown", listener, true);
   }, [bindings]);
 }
