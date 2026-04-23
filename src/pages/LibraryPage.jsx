@@ -7,6 +7,7 @@ import { SubjectSidebar } from "../components/SubjectSidebar";
 import { ThemeChips } from "../components/ThemeChips";
 import { useFlashcardsStore } from "../store/useFlashcardsStore";
 import { themeOptions } from "../utils/defaultDeck";
+import { stripHtml } from "../utils/richText";
 
 export function LibraryPage({ onStartStudy }) {
   const cards = useFlashcardsStore((state) => state.cards);
@@ -29,7 +30,7 @@ export function LibraryPage({ onStartStudy }) {
       const matchesTheme = filters.theme === "Todos" || card.theme === filters.theme;
       const matchesSearch =
         !search ||
-        [card.front, card.back, card.label, card.theme, card.hint].some((value) =>
+        [card.front, stripHtml(card.back), card.label, card.theme, card.hint].some((value) =>
           value.toLowerCase().includes(search),
         );
 
@@ -130,7 +131,7 @@ export function LibraryPage({ onStartStudy }) {
                   <input
                     className="outline-focus w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--bg-card)] py-3 pl-12 pr-4 text-sm text-[var(--text-primary)]"
                     onChange={(event) => setSearchFilter(event.target.value)}
-                    placeholder="Busque por conceito, tema ou explicacao"
+                    placeholder="Busque por conceito, tema ou explicação"
                     value={filters.search}
                   />
                 </label>
@@ -140,21 +141,21 @@ export function LibraryPage({ onStartStudy }) {
 
           <aside className="soft-card rounded-[34px] p-5 sm:p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
-              Direcao visual
+              Direção visual
             </p>
             <h3 className="mt-2 font-display text-3xl tracking-[-0.04em] text-[var(--text-primary)]">
-              Cada assunto ganha sua propria assinatura cromatica.
+              Cada assunto ganha sua própria assinatura cromática.
             </h3>
             <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
               A cor escolhida ao criar o card passa a orientar a barra lateral e deixa a biblioteca mais
-              escaneavel, especialmente quando voce alterna entre conteudos.
+              escaneável, especialmente quando você alterna entre conteúdos.
             </p>
             <div className="mt-5 grid gap-3">
               {[
                 "Barra lateral inspirada em apps mobile curados",
-                "Escolha de cor no cadastro e na edicao",
+                "Escolha de cor no cadastro e na edição",
                 "Cards com faixa superior alinhada ao assunto",
-                "Filtro rapido por assunto direto na lateral",
+                "Filtro rápido por assunto direto na lateral",
               ].map((item) => (
                 <div
                   className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--text-secondary)]"
