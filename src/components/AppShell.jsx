@@ -10,8 +10,8 @@ export function AppShell({ header, children }) {
         style={{ background: "rgba(76, 50, 37, 0.14)" }}
       />
 
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl flex-col gap-8 rounded-[36px] border border-[var(--border-soft)] bg-[var(--bg-secondary)]/70 px-5 py-5 shadow-[0_24px_80px_rgba(0,0,0,0.08)] backdrop-blur-xl sm:px-8 sm:py-8">
-        <header>{header}</header>
+      <div className={`mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl flex-col rounded-[36px] border border-[var(--border-soft)] bg-[var(--bg-secondary)]/70 px-5 py-5 shadow-[0_24px_80px_rgba(0,0,0,0.08)] backdrop-blur-xl sm:px-8 sm:py-8 ${header ? "gap-8" : "gap-0"}`}>
+        {header ? <header>{header}</header> : null}
         <main className="flex-1">{children}</main>
       </div>
     </div>
