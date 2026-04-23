@@ -94,9 +94,10 @@ export function StudyCard({ card, isFlipped, onFlip, progress, total }) {
                 <p className="font-display text-4xl tracking-[-0.04em] text-[var(--text-primary)] sm:text-5xl">
                   {card.front}
                 </p>
-                <p className="mt-6 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                  {card.back}
-                </p>
+                <div
+                  className="rich-text-output mt-6 text-base leading-8 text-[var(--text-secondary)] sm:text-lg"
+                  dangerouslySetInnerHTML={{ __html: card.back }}
+                />
               </div>
 
               <p className="mt-6 text-center text-sm text-[var(--text-secondary)]">
