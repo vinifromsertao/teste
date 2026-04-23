@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PencilLine, Plus, X } from "lucide-react";
+import { RichTextEditor } from "./RichTextEditor";
 import { colorOptions, getColorOption, getStripedCardBackground, getThemeColorId } from "../utils/colorThemes";
+import { getThemeLabel } from "../utils/defaultDeck";
+import { isRichTextEmpty } from "../utils/richText";
 
 const emptyForm = {
   theme: "Figuras de linguagem",
@@ -38,6 +41,10 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (isRichTextEmpty(form.back)) {
+      return;
+    }
+
     onSave(form);
     onClose();
   };
@@ -54,7 +61,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
         >
           <motion.div
             animate={{ y: 0, opacity: 1 }}
-            className="glass-panel w-full max-w-2xl rounded-[34px] p-5 sm:p-7"
+            className="glass-panel w-full max-w-3xl rounded-[34px] p-5 sm:p-7"
             exit={{ y: 16, opacity: 0 }}
             initial={{ y: 24, opacity: 0 }}
             onClick={(event) => event.stopPropagation()}
@@ -63,13 +70,13 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="inline-flex rounded-full bg-[var(--bg-elevated)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--accent)]">
-                  {card ? "Atualizacao" : "Criacao"}
+                  {card ? "Atualização" : "Criação"}
                 </div>
                 <h3 className="mt-3 font-display text-4xl tracking-[-0.04em] text-[var(--text-primary)]">
                   {title}
                 </h3>
                 <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  Escreva um enunciado claro, uma resposta memoravel e um contexto curto.
+                  Escreva um enunciado claro, uma resposta memorável e um contexto curto.
                 </p>
               </div>
 
@@ -110,7 +117,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                         key={option}
                         value={option}
                       >
-                        {option}
+                        {getThemeLabel(option)}
                       </option>
                     ))}
                   </select>
@@ -118,7 +125,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
 
                 <label className="grid gap-2">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                    Label superior
+                    Categoria curta
                   </span>
                   <input
                     className="outline-focus rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)]"
@@ -182,21 +189,23 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                 <input
                   className="outline-focus rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)]"
                   onChange={(event) => setForm((state) => ({ ...state, front: event.target.value }))}
-                  placeholder="Ex.: Metafora"
+                  placeholder="Ex.: Metáfora"
                   required
                   value={form.front}
                 />
               </label>
 
               <label className="grid gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                  Verso
-                </span>
-                <textarea
-                  className="outline-focus min-h-32 rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-4 py-3 text-sm leading-7 text-[var(--text-primary)]"
-                  onChange={(event) => setForm((state) => ({ ...state, back: event.target.value }))}
-                  placeholder="Definicao, exemplo e contexto."
-                  required
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Verso
+                  </span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Editor rico
+                  </span>
+                </div>
+                <RichTextEditor
+                  onChange={(nextBack) => setForm((state) => ({ ...state, back: nextBack }))}
                   value={form.back}
                 />
               </label>
@@ -226,7 +235,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                   type="submit"
                 >
                   {card ? <PencilLine size={16} /> : <Plus size={16} />}
-                  {card ? "Salvar alteracoes" : "Criar flashcard"}
+                  {card ? "Salvar alterações" : "Criar flashcard"}
                 </button>
               </div>
             </form>
