@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PencilLine, Plus, X } from "lucide-react";
+import { colorOptions, getColorOption, getStripedCardBackground, getThemeColorId } from "../utils/colorThemes";
 
 const emptyForm = {
   theme: "Figuras de linguagem",
+  colorId: "amber",
   label: "",
   front: "",
   back: "",
@@ -19,6 +21,7 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
     if (card) {
       setForm({
         theme: card.theme,
+        colorId: card.colorId ?? getThemeColorId(card.theme),
         label: card.label,
         front: card.front,
         back: card.back,
@@ -27,7 +30,10 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
       return;
     }
 
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      colorId: getThemeColorId(emptyForm.theme),
+    });
   }, [card, open]);
 
   const handleSubmit = (event) => {
@@ -87,7 +93,16 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                   </span>
                   <select
                     className="outline-focus rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)]"
-                    onChange={(event) => setForm((state) => ({ ...state, theme: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((state) => ({
+                        ...state,
+                        theme: event.target.value,
+                        colorId:
+                          state.colorId === getThemeColorId(state.theme)
+                            ? getThemeColorId(event.target.value)
+                            : state.colorId,
+                      }))
+                    }
                     value={form.theme}
                   >
                     {themeOptions.map((option) => (
@@ -113,6 +128,51 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                     value={form.label}
                   />
                 </label>
+              </div>
+
+              <div className="grid gap-3">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Cor do assunto
+                  </span>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    Essa cor aparece na barra lateral e passa a identidade visual do assunto.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {colorOptions.map((option) => {
+                    const active = form.colorId === option.id;
+                    return (
+                      <button
+                        className={`outline-focus rounded-[22px] border p-3 text-left transition ${
+                          active ? "scale-[1.01] shadow-[0_10px_30px_rgba(0,0,0,0.12)]" : "hover:translate-y-[-1px]"
+                        }`}
+                        key={option.id}
+                        onClick={() => setForm((state) => ({ ...state, colorId: option.id }))}
+                        style={{
+                          background: getStripedCardBackground(option.id),
+                          borderColor: active ? "rgba(255,255,255,0.45)" : option.border,
+                          color: option.text,
+                        }}
+                        type="button"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/78">
+                              Paleta
+                            </p>
+                            <p className="mt-1 text-base font-semibold">{option.name}</p>
+                          </div>
+                          <div
+                            className="h-10 w-10 rounded-2xl border border-white/30"
+                            style={{ backgroundColor: getColorOption(option.id).solid }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <label className="grid gap-2">
