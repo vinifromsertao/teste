@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Edit3, Flame, PenSquare, Trash2 } from "lucide-react";
 import { getThemeColorId, getThemeVisual } from "../utils/colorThemes";
+import { getThemeLabel } from "../utils/defaultDeck";
+import { stripHtml } from "../utils/richText";
 
 function formatNextReview(card) {
   const nextDue = card.studyMeta?.nextDueAt ?? Date.now();
@@ -60,7 +62,7 @@ export function FlashcardGrid({ cards, onEdit, onDelete, themeStyles }) {
                       <p className="font-display text-3xl tracking-[-0.04em] text-[var(--text-primary)]">
                         {card.front}
                       </p>
-                      <p className="mt-2 text-sm text-[var(--text-secondary)]">{card.theme}</p>
+                      <p className="mt-2 text-sm text-[var(--text-secondary)]">{getThemeLabel(card.theme)}</p>
                     </div>
                   </div>
 
@@ -71,13 +73,13 @@ export function FlashcardGrid({ cards, onEdit, onDelete, themeStyles }) {
                 </div>
 
                 <p className="mt-5 max-h-[4.5rem] overflow-hidden text-sm leading-6 text-[var(--text-secondary)]">
-                  {card.back}
+                  {stripHtml(card.back)}
                 </p>
 
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
-                      Proxima revisao
+                      Próxima revisão
                     </p>
                     <p className="text-sm text-[var(--text-primary)]">{formatNextReview(card)}</p>
                   </div>
@@ -115,7 +117,7 @@ export function FlashcardGrid({ cards, onEdit, onDelete, themeStyles }) {
             Nenhum card encontrado
           </h3>
           <p className="mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
-            Ajuste os filtros ou crie um novo flashcard para alimentar sua sessao de estudo.
+            Ajuste os filtros ou crie um novo flashcard para alimentar sua sessão de estudo.
           </p>
         </div>
       ) : null}
