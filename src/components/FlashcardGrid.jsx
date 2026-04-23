@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Edit3, Flame, PenSquare, Trash2 } from "lucide-react";
+import { getThemeColorId, getThemeVisual } from "../utils/colorThemes";
 
 function formatNextReview(card) {
   const nextDue = card.studyMeta?.nextDueAt ?? Date.now();
@@ -18,71 +19,93 @@ function formatNextReview(card) {
   return `Em ${days}d`;
 }
 
-export function FlashcardGrid({ cards, onEdit, onDelete }) {
+export function FlashcardGrid({ cards, onEdit, onDelete, themeStyles }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
       <AnimatePresence>
-        {cards.map((card, index) => (
-          <motion.article
-            animate={{ opacity: 1, y: 0 }}
-            className="soft-card rounded-[30px] p-5"
-            exit={{ opacity: 0, y: 16 }}
-            initial={{ opacity: 0, y: 18 }}
-            key={card.id}
-            transition={{ delay: index * 0.02, duration: 0.26 }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-3">
-                <div className="inline-flex rounded-full bg-[var(--bg-elevated)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--accent)]">
-                  {card.label}
+        {cards.map((card, index) => {
+          const visual = getThemeVisual(card.theme, {
+            ...themeStyles,
+            [card.theme]: card.colorId ?? getThemeColorId(card.theme, themeStyles),
+          });
+
+          return (
+            <motion.article
+              animate={{ opacity: 1, y: 0 }}
+              className="soft-card overflow-hidden rounded-[30px]"
+              exit={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 18 }}
+              key={card.id}
+              transition={{ delay: index * 0.02, duration: 0.26 }}
+            >
+              <div
+                className="h-2 w-full"
+                style={{
+                  background: `linear-gradient(90deg, ${visual.gradient[0]}, ${visual.gradient[1]}, ${visual.gradient[2]}, ${visual.gradient[3]})`,
+                }}
+              />
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-3">
+                    <div
+                      className="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]"
+                      style={{
+                        background: visual.soft,
+                        color: visual.solid,
+                      }}
+                    >
+                      {card.label}
+                    </div>
+                    <div>
+                      <p className="font-display text-3xl tracking-[-0.04em] text-[var(--text-primary)]">
+                        {card.front}
+                      </p>
+                      <p className="mt-2 text-sm text-[var(--text-secondary)]">{card.theme}</p>
+                    </div>
+                  </div>
+
+                  <div className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+                    <Flame size={14} />
+                    {card.studyMeta?.streak ?? 0}
+                  </div>
                 </div>
-                <div>
-                  <p className="font-display text-3xl tracking-[-0.04em] text-[var(--text-primary)]">
-                    {card.front}
-                  </p>
-                  <p className="mt-2 text-sm text-[var(--text-secondary)]">{card.theme}</p>
-                </div>
-              </div>
 
-              <div className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)]">
-                <Flame size={14} />
-                {card.studyMeta?.streak ?? 0}
-              </div>
-            </div>
-
-            <p className="mt-5 max-h-[4.5rem] overflow-hidden text-sm leading-6 text-[var(--text-secondary)]">
-              {card.back}
-            </p>
-
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
-                  Proxima revisao
+                <p className="mt-5 max-h-[4.5rem] overflow-hidden text-sm leading-6 text-[var(--text-secondary)]">
+                  {card.back}
                 </p>
-                <p className="text-sm text-[var(--text-primary)]">{formatNextReview(card)}</p>
+
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                      Proxima revisao
+                    </p>
+                    <p className="text-sm text-[var(--text-primary)]">{formatNextReview(card)}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      className="outline-focus inline-flex items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)]"
+                      onClick={() => onEdit(card)}
+                      type="button"
+                    >
+                      <Edit3 size={15} />
+                      Editar
+                    </button>
+                    <button
+                      className="outline-focus inline-flex items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--danger)] transition hover:bg-[var(--bg-elevated)]"
+                      onClick={() => onDelete(card.id)}
+                      type="button"
+                    >
+                      <Trash2 size={15} />
+                      Excluir
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  className="outline-focus inline-flex items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)]"
-                  onClick={() => onEdit(card)}
-                  type="button"
-                >
-                  <Edit3 size={15} />
-                  Editar
-                </button>
-                <button
-                  className="outline-focus inline-flex items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--danger)] transition hover:bg-[var(--bg-elevated)]"
-                  onClick={() => onDelete(card.id)}
-                  type="button"
-                >
-                  <Trash2 size={15} />
-                  Excluir
-                </button>
-              </div>
-            </div>
-          </motion.article>
-        ))}
+            </motion.article>
+          );
+        })}
       </AnimatePresence>
+
       {cards.length === 0 ? (
         <div className="soft-card col-span-full flex min-h-60 flex-col items-center justify-center rounded-[32px] p-8 text-center">
           <div className="bg-accent-soft flex h-14 w-14 items-center justify-center rounded-3xl text-[var(--accent)]">
