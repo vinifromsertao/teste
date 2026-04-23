@@ -123,19 +123,21 @@ export function FlashcardComposer({ card, open, onClose, onSave, themeOptions })
                   </select>
                 </label>
 
-                <label className="grid gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                    Categoria curta
-                  </span>
-                  <input
-                    className="outline-focus rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)]"
-                    onChange={(event) => setForm((state) => ({ ...state, label: event.target.value }))}
-                    placeholder="Ex.: Figuras de som"
-                    required
-                    value={form.label}
-                  />
-                </label>
-              </div>
+               <div className="grid gap-2">
+  <div className="flex items-center justify-between gap-3">
+    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+      Verso
+    </span>
+    <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+      Editor rico
+    </span>
+  </div>
+  <RichTextEditor
+    onChange={(nextBack) => setForm((state) => ({ ...state, back: nextBack }))}
+    value={form.back}
+  />
+</div>
+
 
               <div className="grid gap-3">
                 <div>
