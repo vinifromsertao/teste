@@ -22,9 +22,9 @@ export function LoadingScreen() {
           />
         </motion.div>
         <div className="space-y-2 text-center">
-          <p className="font-display text-3xl tracking-[-0.04em]">Preparando a revisao</p>
+          <p className="font-display text-3xl tracking-[-0.04em]">Preparando a revisão</p>
           <p className="text-sm uppercase tracking-[0.32em] text-[var(--text-muted)]">
-            animacao suave, foco absoluto
+            animação suave, foco absoluto
           </p>
         </div>
       </div>
