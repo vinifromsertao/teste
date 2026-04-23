@@ -88,27 +88,56 @@ body::before {
 }
 
 .card-viewport {
-  perspective: 1800px;
+  perspective: 2200px;
 }
 
 .card-3d {
   position: relative;
+  transform: rotateY(0deg) scale(1);
+  transform-origin: center center;
   transform-style: preserve-3d;
-  transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+  transition:
+    transform 920ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 920ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card-3d:hover {
+  filter: brightness(1.015);
 }
 
 .card-3d.is-flipped {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) scale(1.002);
 }
 
 .card-face {
   backface-visibility: hidden;
   transform-style: preserve-3d;
+  transition:
+    opacity 420ms ease,
+    box-shadow 920ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card-3d:not(.is-flipped) .card-face.front {
+  opacity: 1;
+}
+
+.card-3d:not(.is-flipped) .card-face.back {
+  opacity: 0.96;
+}
+
+.card-3d.is-flipped .card-face.front {
+  opacity: 0.96;
+}
+
+.card-3d.is-flipped .card-face.back {
+  opacity: 1;
 }
 
 .card-face.back {
   transform: rotateY(180deg);
 }
+
 
 .scrollbar-soft::-webkit-scrollbar {
   width: 10px;
