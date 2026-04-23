@@ -18,9 +18,9 @@ export function StudyControls({
       <div className="glass-panel rounded-[30px] p-4">
         <div className="flex flex-wrap gap-3">
           {[
-            ["hard", "Dificil"],
-            ["medium", "Medio"],
-            ["easy", "Facil"],
+            ["hard", "Difícil"],
+            ["medium", "Médio"],
+            ["easy", "Fácil"],
           ].map(([key, label]) => (
             <button
               className={`outline-focus rounded-2xl px-4 py-3 text-sm font-semibold transition ${ratingStyles[key]} ${!canRate ? "cursor-not-allowed opacity-40" : ""}`}
@@ -49,7 +49,7 @@ export function StudyControls({
           onClick={onNext}
           type="button"
         >
-          Proximo
+          Próximo
           <ArrowRight size={16} />
         </button>
         <button
