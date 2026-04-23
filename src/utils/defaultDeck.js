@@ -9,6 +9,7 @@ export const defaultCards = [
   {
     id: "fig-1",
     theme: "Figuras de linguagem",
+    colorId: "amber",
     label: "Figuras de som",
     front: "Paronomasia",
     back: "Figura que aproxima palavras de sons parecidos, mas significados diferentes. Exemplo: 'Conhecer para compreender, compreender para crescer.'",
@@ -19,6 +20,7 @@ export const defaultCards = [
   {
     id: "fig-2",
     theme: "Figuras de linguagem",
+    colorId: "amber",
     label: "Figuras de pensamento",
     front: "Ironia",
     back: "Consiste em dizer o contrario do que se quer comunicar, gerando efeito critico ou humoristico.",
@@ -29,6 +31,7 @@ export const defaultCards = [
   {
     id: "gram-1",
     theme: "Gramatica",
+    colorId: "gold",
     label: "Analise sintatica",
     front: "Predicado verbal",
     back: "Predicado cujo nucleo e um verbo significativo, indicando acao ou processo praticado ou sofrido pelo sujeito.",
@@ -39,6 +42,7 @@ export const defaultCards = [
   {
     id: "gram-2",
     theme: "Gramatica",
+    colorId: "gold",
     label: "Classes de palavras",
     front: "Pronome relativo",
     back: "Pronome que retoma um termo anterior e inicia uma oracao subordinada adjetiva, como 'que', 'quem', 'cujo'.",
@@ -49,6 +53,7 @@ export const defaultCards = [
   {
     id: "int-1",
     theme: "Interpretacao",
+    colorId: "teal",
     label: "Leitura critica",
     front: "Tese do texto",
     back: "Ideia principal defendida pelo autor ao longo do texto. Costuma aparecer na introducao ou ser retomada na conclusao.",
@@ -59,6 +64,7 @@ export const defaultCards = [
   {
     id: "int-2",
     theme: "Interpretacao",
+    colorId: "teal",
     label: "Leitura inferencial",
     front: "Inferencia",
     back: "Conclusao construida pelo leitor a partir de pistas do texto, mesmo que a informacao nao esteja escrita de forma direta.",
@@ -69,6 +75,7 @@ export const defaultCards = [
   {
     id: "orto-1",
     theme: "Ortografia",
+    colorId: "olive",
     label: "Uso das letras",
     front: "Mal ou mau?",
     back: "'Mal' e oposto de 'bem'. 'Mau' e oposto de 'bom'. Exemplo: 'Ele passou mal.' / 'Era um mau exemplo.'",
@@ -79,6 +86,7 @@ export const defaultCards = [
   {
     id: "orto-2",
     theme: "Ortografia",
+    colorId: "olive",
     label: "Acentuacao",
     front: "Hiato",
     back: "Encontro de duas vogais em silabas separadas, como em 'sa-ida'. Em alguns casos, isso influencia a acentuacao.",
