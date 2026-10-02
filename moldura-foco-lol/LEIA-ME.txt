@@ -28,6 +28,10 @@ Antes de começar (só na primeira vez)
 Como usar
 ---------
 1. Dê dois cliques em "Iniciar Moldura.bat".
+   O Windows pergunta se o programa pode fazer alterações: clique em "Sim".
+   (O LoL roda como administrador, e sem essa permissão o Windows bloqueia
+   os atalhos de teclado enquanto o jogo está na frente. A moldura não
+   altera nada no computador.)
    Aparece um aviso no canto da tela e um ícone de cantoneiras amarelas
    perto do relógio do Windows (se não achar, clique na setinha ^ ao lado
    do relógio).
@@ -131,6 +135,12 @@ Feche a moldura quando terminar de jogar.
 
 Perguntas comuns
 ----------------
+* Os atalhos funcionam fora do jogo, mas não com o jogo na frente.
+  A moldura foi aberta sem permissão de administrador. Feche (ícone perto
+  do relógio > Sair), abra de novo pelo "Iniciar Moldura.bat" e clique em
+  "Sim" no aviso do Windows. Se você usava uma versão antiga da moldura,
+  feche-a antes.
+
 * A moldura não aparece no jogo.
   Confira se o jogo está em "Sem bordas", e não em "Tela cheia".
 

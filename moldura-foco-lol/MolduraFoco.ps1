@@ -1,11 +1,28 @@
 ﻿# Moldura de Foco para League of Legends
 #
-# Desenha uma moldura fixa no centro da janela do jogo (ou da tela) para
-# ajudar a não perder o seu campeão de vista. Funciona com a câmera travada.
+# Desenha uma moldura em volta do seu campeão para ajudar a não perdê-lo de
+# vista: fixa no lugar dele com a câmera travada ou, no modo experimental,
+# seguindo a barra de vida dele pela tela.
 # A moldura é só um desenho por cima da tela: não lê nem altera nada do jogo
 # e deixa os cliques do mouse passarem direto para o jogo.
 #
 # Para abrir, dê dois cliques em "Iniciar Moldura.bat".
+
+# O LoL roda como administrador, e o Windows bloqueia os atalhos de teclado de
+# programas comuns enquanto uma janela de administrador está na frente. Por isso
+# a moldura pede para abrir como administrador (o Windows mostra um aviso: "Sim").
+$principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+$administrador = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $administrador) {
+    try {
+        Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -ErrorAction Stop -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-WindowStyle', 'Hidden', '-File', "`"$PSCommandPath`"")
+        exit
+    }
+    catch {
+        # Clicou "Não" no aviso: abre mesmo assim, mas os atalhos só funcionam fora do jogo.
+    }
+}
 
 $codigo = @'
 using System;
@@ -28,14 +45,16 @@ namespace MolduraFoco
 {
     public static class Program
     {
-        public static void Run()
+        public static void Run(bool isAdmin)
         {
             bool primeiraInstancia;
             using (System.Threading.Mutex mutex = new System.Threading.Mutex(true, "MolduraFocoLoL_InstanciaUnica", out primeiraInstancia))
             {
                 if (!primeiraInstancia)
                 {
-                    MessageBox.Show("A Moldura de Foco já está aberta.\n\nProcure o ícone dela perto do relógio do Windows.",
+                    MessageBox.Show("A Moldura de Foco já está aberta.\n\nProcure o ícone dela perto do relógio do Windows. "
+                        + "Se os atalhos não funcionam dentro do jogo, feche essa moldura (ícone > Sair) e abra de novo, "
+                        + "clicando em \"Sim\" no aviso do Windows.",
                         "Moldura de Foco", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
@@ -48,7 +67,7 @@ namespace MolduraFoco
                     MessageBox.Show("Ocorreu um erro:\n\n" + e.Exception.Message, "Moldura de Foco",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-                using (FocusApp app = new FocusApp())
+                using (FocusApp app = new FocusApp(isAdmin))
                 {
                     Application.Run(app);
                 }
@@ -1180,8 +1199,11 @@ namespace MolduraFoco
         readonly List<ToolStripMenuItem> thicknessItems = new List<ToolStripMenuItem>();
         readonly List<ToolStripMenuItem> opacityItems = new List<ToolStripMenuItem>();
 
-        public FocusApp()
+        readonly bool isAdmin;
+
+        public FocusApp(bool isAdmin)
         {
+            this.isAdmin = isAdmin;
             settings = Settings.Load();
             overlay = new OverlayForm(settings);
 
@@ -1216,7 +1238,11 @@ namespace MolduraFoco
             string message = failed.Length == 0
                 ? "Ctrl+Alt+F mostra ou esconde a moldura. Clique com o botão direito neste ícone para trocar forma, cor e tamanho."
                 : "Estes atalhos já estão em uso por outro programa: " + failed + ". As mesmas opções estão no menu deste ícone.";
-            tray.ShowBalloonTip(6000, "Moldura de Foco ligada", message, ToolTipIcon.Info);
+            if (!isAdmin)
+                message = "Aberta sem permissão de administrador: os atalhos não vão funcionar com o jogo na frente. "
+                        + "Para corrigir, feche (ícone > Sair), abra de novo e clique em \"Sim\" no aviso do Windows.";
+            tray.ShowBalloonTip(isAdmin ? 6000 : 15000, "Moldura de Foco ligada", message,
+                isAdmin ? ToolTipIcon.Info : ToolTipIcon.Warning);
         }
 
         // ---------- posição e visibilidade ----------
@@ -1627,6 +1653,7 @@ namespace MolduraFoco
                 Point unused;
                 status += tracker.TryGetCenter(out unused) ? " - seguindo" : " - procurando o campeão";
             }
+            if (!isAdmin) status += " - atalhos só fora do jogo (sem administrador)";
             statusItem.Text = status;
             followItem.Checked = IsFollowing;
             showItem.Checked = visible;
@@ -1772,7 +1799,7 @@ try {
     $referencias = [System.Windows.Forms.Form], [System.Drawing.Color], [System.Web.Script.Serialization.JavaScriptSerializer] |
         ForEach-Object { $_.Assembly.Location }
     Add-Type -TypeDefinition $codigo -Language CSharp -ReferencedAssemblies $referencias
-    [MolduraFoco.Program]::Run()
+    [MolduraFoco.Program]::Run($administrador)
 }
 catch {
     [System.Windows.Forms.MessageBox]::Show(
