@@ -136,10 +136,17 @@ Feche a moldura quando terminar de jogar.
 Perguntas comuns
 ----------------
 * Os atalhos funcionam fora do jogo, mas não com o jogo na frente.
-  A moldura foi aberta sem permissão de administrador. Feche (ícone perto
-  do relógio > Sair), abra de novo pelo "Iniciar Moldura.bat" e clique em
-  "Sim" no aviso do Windows. Se você usava uma versão antiga da moldura,
-  feche-a antes.
+  Durante a partida o LoL desliga os atalhos comuns do Windows. Por isso a
+  moldura escuta o teclado de outro jeito (um "gancho" de teclado), que só
+  reage aos atalhos Ctrl + Alt dela, não guarda nada do que você digita e
+  esconde esses atalhos do jogo (assim Ctrl + Alt + B não aciona o Recall,
+  por exemplo). Para isso funcionar com o jogo na frente, ela precisa
+  abrir como administrador:
+  - Feche todas as molduras abertas (ícone perto do relógio > Sair),
+    inclusive de versões antigas.
+  - Abra pelo "Iniciar Moldura.bat" e clique em "Sim" no aviso do Windows.
+  - Clique no ícone: se a primeira linha do menu disser "atalhos só fora
+    do jogo", ela não conseguiu essa permissão.
 
 * A moldura não aparece no jogo.
   Confira se o jogo está em "Sem bordas", e não em "Tela cheia".

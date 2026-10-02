@@ -102,6 +102,23 @@ namespace MolduraFoco
         [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
         [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
         [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        public const int WH_KEYBOARD_LL = 13;
+        public const int WM_KEYDOWN = 0x0100;
+        public const int WM_KEYUP = 0x0101;
+        public const int WM_SYSKEYDOWN = 0x0104;
+        public const int WM_SYSKEYUP = 0x0105;
+        public const int LLKHF_INJECTED = 0x10;
+        public const int VK_CONTROL = 0x11;
+        public const int VK_MENU = 0x12;
+
+        public delegate IntPtr LowLevelKeyboardProc(int code, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc proc, IntPtr hMod, uint threadId);
+        [DllImport("user32.dll")] public static extern bool UnhookWindowsHookEx(IntPtr hook);
+        [DllImport("user32.dll")] public static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
+        [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr GetModuleHandle(string moduleName);
         [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string className, string windowName);
         [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
@@ -1127,19 +1144,89 @@ namespace MolduraFoco
         }
     }
 
-    // Recebe os atalhos de teclado globais (funcionam mesmo com o jogo em foco).
+    // Decide o que fazer com cada tecla que passa pelo gancho de teclado. Só os atalhos
+    // Ctrl+Alt da moldura são usados (e escondidos do jogo); o resto passa direto.
+    internal sealed class KeyFilter
+    {
+        sealed class Binding
+        {
+            public Action Action;
+            public bool Repeat;
+        }
+
+        readonly Dictionary<int, Binding> bindings = new Dictionary<int, Binding>();
+        readonly bool[] held = new bool[256];   // teclas cujo "apertar" foi escondido do jogo
+
+        public void Bind(int vk, bool repeat, Action action)
+        {
+            Binding b = new Binding();
+            b.Action = action;
+            b.Repeat = repeat;
+            bindings[vk] = b;
+        }
+
+        // Devolve true se a tecla deve ser escondida do jogo. 'fire' recebe a ação a executar.
+        public bool Handle(int vk, bool down, bool up, bool ctrlAlt, out Action fire)
+        {
+            fire = null;
+            if (vk < 0 || vk >= 256) return false;
+            if (up)
+            {
+                // Esconde também o "soltar" das teclas cujo "apertar" foi escondido.
+                bool wasHeld = held[vk];
+                held[vk] = false;
+                return wasHeld;
+            }
+            if (!down) return false;
+
+            Binding b;
+            if (!ctrlAlt || !bindings.TryGetValue(vk, out b))
+            {
+                held[vk] = false;
+                return false;
+            }
+            bool repeating = held[vk];   // tecla segurada: o Windows repete o "apertar"
+            held[vk] = true;
+            if (!repeating || b.Repeat) fire = b.Action;
+            return true;
+        }
+    }
+
+    // Recebe os atalhos de teclado globais. O LoL desliga os atalhos comuns do Windows
+    // (RegisterHotKey) enquanto a partida está na frente, então a moldura escuta o teclado
+    // por um gancho (WH_KEYBOARD_LL), que continua funcionando no jogo. Ele só reage aos
+    // atalhos Ctrl+Alt da moldura e não guarda nada do que é digitado. Se o gancho não
+    // puder ser instalado, usa os atalhos comuns (que funcionam fora da partida).
     internal sealed class HotkeyWindow : NativeWindow, IDisposable
     {
+        const int WM_APP_ACTION = 0x8000 + 1;
+
+        readonly KeyFilter filter = new KeyFilter();
+        readonly Native.LowLevelKeyboardProc hookProc;   // guardado para não ser recolhido da memória
+        readonly IntPtr hook;
         readonly Dictionary<int, Action> actions = new Dictionary<int, Action>();
+        readonly Queue<Action> pending = new Queue<Action>();
         int nextId = 1;
 
         public HotkeyWindow()
         {
             CreateHandle(new CreateParams());
+            hookProc = OnKey;
+            hook = Native.SetWindowsHookEx(Native.WH_KEYBOARD_LL, hookProc, Native.GetModuleHandle(null), 0);
+        }
+
+        public bool UsesKeyboardHook
+        {
+            get { return hook != IntPtr.Zero; }
         }
 
         public bool Bind(Keys key, bool repeat, Action action)
         {
+            if (hook != IntPtr.Zero)
+            {
+                filter.Bind((int)key, repeat, action);
+                return true;
+            }
             int id = nextId++;
             uint mods = Native.MOD_CONTROL | Native.MOD_ALT | (repeat ? 0u : Native.MOD_NOREPEAT);
             if (!Native.RegisterHotKey(Handle, id, mods, (uint)key)) return false;
@@ -1147,9 +1234,40 @@ namespace MolduraFoco
             return true;
         }
 
+        IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)
+        {
+            if (code >= 0)
+            {
+                int msg = wParam.ToInt32();
+                int vk = Marshal.ReadInt32(lParam);          // KBDLLHOOKSTRUCT.vkCode
+                int flags = Marshal.ReadInt32(lParam, 8);    // KBDLLHOOKSTRUCT.flags
+                bool injected = (flags & Native.LLKHF_INJECTED) != 0;
+                bool down = msg == Native.WM_KEYDOWN || msg == Native.WM_SYSKEYDOWN;
+                bool up = msg == Native.WM_KEYUP || msg == Native.WM_SYSKEYUP;
+                bool ctrlAlt = Native.GetAsyncKeyState(Native.VK_CONTROL) < 0 && Native.GetAsyncKeyState(Native.VK_MENU) < 0;
+                Action fire;
+                if (!injected && filter.Handle(vk, down, up, ctrlAlt, out fire))
+                {
+                    // O gancho precisa responder rápido: a ação roda logo depois, fora dele.
+                    if (fire != null)
+                    {
+                        pending.Enqueue(fire);
+                        Native.PostMessage(Handle, WM_APP_ACTION, IntPtr.Zero, IntPtr.Zero);
+                    }
+                    return (IntPtr)1;
+                }
+            }
+            return Native.CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
+        }
+
         protected override void WndProc(ref Message m)
         {
             Action action;
+            if (m.Msg == WM_APP_ACTION)
+            {
+                while (pending.Count > 0) pending.Dequeue()();
+                return;
+            }
             if (m.Msg == Native.WM_HOTKEY && actions.TryGetValue(m.WParam.ToInt32(), out action))
             {
                 action();
@@ -1160,6 +1278,7 @@ namespace MolduraFoco
 
         public void Dispose()
         {
+            if (hook != IntPtr.Zero) Native.UnhookWindowsHookEx(hook);
             foreach (int id in actions.Keys) Native.UnregisterHotKey(Handle, id);
             actions.Clear();
             DestroyHandle();
@@ -1654,6 +1773,7 @@ namespace MolduraFoco
                 status += tracker.TryGetCenter(out unused) ? " - seguindo" : " - procurando o campeão";
             }
             if (!isAdmin) status += " - atalhos só fora do jogo (sem administrador)";
+            else if (!hotkeys.UsesKeyboardHook) status += " - atalhos só fora da partida";
             statusItem.Text = status;
             followItem.Checked = IsFollowing;
             showItem.Checked = visible;
