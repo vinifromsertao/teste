@@ -1,0 +1,101 @@
+﻿MOLDURA DE FOCO PARA LEAGUE OF LEGENDS
+======================================
+
+O que é
+-------
+Um pequeno programa para Windows 10 ou 11 que desenha uma moldura colorida
+no centro da tela do jogo, onde o seu campeão fica quando a câmera está
+travada. Ele não lê nem altera nada do jogo: só desenha uma figura por cima
+da tela (como um adesivo no monitor), e os cliques passam direto para o jogo.
+Não precisa instalar nada; ele usa o PowerShell que já vem no Windows.
+
+
+Antes de começar (só na primeira vez)
+-------------------------------------
+1. Clique com o botão direito no arquivo .zip que você baixou > Propriedades.
+   Se aparecer a caixa "Desbloquear", marque e clique em OK.
+   Depois extraia a pasta. (Isso evita que o Windows bloqueie o programa
+   por ele ter vindo da internet.)
+
+2. No League of Legends, abra as Configurações (tecla Esc durante a partida):
+   - Vídeo > Modo de janela: escolha "Sem bordas".
+     No modo "Tela cheia" o Windows não deixa nada aparecer por cima do jogo.
+   - Jogue com a câmera travada. A tecla Y trava e destrava a câmera
+     (padrão do jogo). Segurar a barra de espaço também centraliza a
+     câmera no seu campeão.
+   - Nas opções de câmera, se existir um "modo de câmera travada", prefira
+     o deslocamento fixo ("Fixed Offset"). Assim o campeão fica no mesmo
+     ponto da tela jogando tanto do lado azul quanto do vermelho.
+
+
+Como usar
+---------
+1. Dê dois cliques em "Iniciar Moldura.bat".
+   Aparece um aviso no canto da tela e um ícone de cantoneiras amarelas
+   perto do relógio do Windows (se não achar, clique na setinha ^ ao lado
+   do relógio).
+2. Abra o jogo normalmente.
+3. Na primeira vez, entre no modo Prática e encaixe a moldura no seu
+   campeão com os atalhos abaixo. O ajuste fica salvo para as próximas vezes.
+
+
+Atalhos (funcionam com o jogo aberto)
+-------------------------------------
+Ctrl + Alt + F ............ mostrar / esconder a moldura
+Ctrl + Alt + setas ........ mover a moldura
+Ctrl + Alt + (+) / (-) .... aumentar / diminuir (também PageUp / PageDown)
+Ctrl + Alt + M ............ trocar a forma
+Ctrl + Alt + C ............ trocar a cor
+Ctrl + Alt + P ............ ligar / desligar o efeito de pulsar
+Ctrl + Alt + R ............ voltar à posição e ao tamanho iniciais
+
+Formas: cantoneiras (padrão), círculo, quadrado e seta acima da cabeça.
+Cores: amarelo, ciano, verde-limão, rosa-choque, laranja, branco e roxo.
+(O vermelho ficou de fora porque no LoL ele indica os inimigos.)
+
+Mais opções (espessura da linha, opacidade, monitor e "mostrar só durante a
+partida"): clique no ícone da moldura perto do relógio.
+
+
+Opção "Mostrar só durante a partida"
+------------------------------------
+Com ela ligada, a moldura some quando você está no lobby, na seleção de
+campeões ou em outro programa, e volta sozinha quando a janela da partida
+está na frente. Ela vem desligada. Se, ao ligar, a moldura não aparecer
+durante a partida, desligue de novo e use Ctrl + Alt + F.
+
+
+Para fechar
+-----------
+Clique no ícone perto do relógio > Sair.
+
+Enquanto a moldura estiver aberta, os atalhos Ctrl + Alt acima ficam
+reservados para ela. No teclado ABNT2, a tecla AltGr equivale a Ctrl + Alt,
+então AltGr + C (₢) e AltGr + = (§) não funcionam nesse período.
+Feche a moldura quando terminar de jogar.
+
+
+Perguntas comuns
+----------------
+* A moldura não aparece no jogo.
+  Confira se o jogo está em "Sem bordas", e não em "Tela cheia".
+
+* A moldura não fica em cima do campeão.
+  Trave a câmera (Y) e ajuste com Ctrl + Alt + setas. Com a câmera solta,
+  o campeão sai do centro da tela; segure Espaço para centralizar de novo.
+
+* Apareceu um aviso do Windows ou do antivírus.
+  O programa é um arquivo de texto (MolduraFoco.ps1) que pode ser aberto no
+  Bloco de Notas para conferir o que ele faz. Se aparecer "O Windows protegeu
+  o computador", clique em "Mais informações" > "Executar assim mesmo".
+
+* Isso pode dar banimento?
+  O programa não lê a memória do jogo, não automatiza nenhuma ação e não
+  mostra informação escondida. Ele só desenha uma figura fixa na tela e
+  pergunta ao Windows onde está a janela do jogo (como fazem programas de
+  gravação, por exemplo o OBS). Mesmo assim, quem decide o que é permitido
+  é a Riot, e as regras podem mudar. Use por sua conta.
+
+* Quero voltar tudo ao padrão.
+  Apague o arquivo %APPDATA%\MolduraFocoLoL\config.txt (cole esse endereço
+  na barra do Explorador de Arquivos) com a moldura fechada.
