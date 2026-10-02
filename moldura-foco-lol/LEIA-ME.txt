@@ -20,12 +20,9 @@ Antes de começar (só na primeira vez)
 2. No League of Legends, abra as Configurações (tecla Esc durante a partida):
    - Vídeo > Modo de janela: escolha "Sem bordas".
      No modo "Tela cheia" o Windows não deixa nada aparecer por cima do jogo.
-   - Jogue com a câmera travada. A tecla Y trava e destrava a câmera
-     (padrão do jogo). Segurar a barra de espaço também centraliza a
-     câmera no seu campeão.
-   - Nas opções de câmera, se existir um "modo de câmera travada", prefira
-     o deslocamento fixo ("Fixed Offset"). Assim o campeão fica no mesmo
-     ponto da tela jogando tanto do lado azul quanto do vermelho.
+   - A moldura marca o lugar onde o campeão fica com a câmera TRAVADA.
+     Com a câmera solta ela continua nesse lugar e não acompanha o
+     campeão (veja "Perguntas comuns").
 
 
 Como usar
@@ -35,8 +32,26 @@ Como usar
    perto do relógio do Windows (se não achar, clique na setinha ^ ao lado
    do relógio).
 2. Abra o jogo normalmente.
-3. Na primeira vez, entre no modo Prática e encaixe a moldura no seu
-   campeão com os atalhos abaixo. O ajuste fica salvo para as próximas vezes.
+3. Na primeira partida, trave a câmera e encaixe a moldura no seu campeão
+   com os atalhos abaixo. O ajuste fica salvo para as próximas vezes.
+
+
+Lado azul e lado vermelho
+-------------------------
+Com a câmera em "contrapeso por lado", o campeão fica num ponto da tela
+no lado azul e em outro no lado vermelho. Por isso a moldura guarda duas
+posições e troca sozinha conforme o lado da partida.
+
+Ela descobre o lado pela API oficial que o próprio LoL abre no computador
+durante a partida (a mesma usada por aplicativos de estatísticas). Essa API
+informa o time e se o campeão está morto, mas não a posição dele na tela.
+
+Faça o ajuste uma vez numa partida do lado azul e outra do lado vermelho.
+Ao clicar no ícone perto do relógio, a primeira linha do menu mostra qual
+lado foi detectado. Fora de partida vale a posição do lado azul.
+
+Enquanto o campeão está morto, a moldura some sozinha. Isso pode ser
+desligado no menu ("Esconder quando o campeão morrer").
 
 
 Atalhos (funcionam com o jogo aberto)
@@ -48,6 +63,7 @@ Ctrl + Alt + M ............ trocar a forma
 Ctrl + Alt + C ............ trocar a cor
 Ctrl + Alt + P ............ ligar / desligar o efeito de pulsar
 Ctrl + Alt + R ............ voltar à posição e ao tamanho iniciais
+                            (só do lado da partida atual)
 
 Formas: cantoneiras (padrão), círculo, quadrado e seta acima da cabeça.
 Cores: amarelo, ciano, verde-limão, rosa-choque, laranja, branco e roxo.
@@ -81,8 +97,11 @@ Perguntas comuns
   Confira se o jogo está em "Sem bordas", e não em "Tela cheia".
 
 * A moldura não fica em cima do campeão.
-  Trave a câmera (Y) e ajuste com Ctrl + Alt + setas. Com a câmera solta,
-  o campeão sai do centro da tela; segure Espaço para centralizar de novo.
+  Com a câmera travada, ajuste com Ctrl + Alt + setas (cada lado do mapa
+  tem o seu ajuste). Com a câmera solta o campeão anda pela tela e a moldura
+  não tem como acompanhar: o jogo não informa a posição do campeão aos
+  programas, e a moldura também não sabe se a câmera está travada. Se ela
+  atrapalhar nesses momentos, esconda com Ctrl + Alt + F.
 
 * Apareceu um aviso do Windows ou do antivírus.
   O programa é um arquivo de texto (MolduraFoco.ps1) que pode ser aberto no
@@ -91,10 +110,11 @@ Perguntas comuns
 
 * Isso pode dar banimento?
   O programa não lê a memória do jogo, não automatiza nenhuma ação e não
-  mostra informação escondida. Ele só desenha uma figura fixa na tela e
-  pergunta ao Windows onde está a janela do jogo (como fazem programas de
-  gravação, por exemplo o OBS). Mesmo assim, quem decide o que é permitido
-  é a Riot, e as regras podem mudar. Use por sua conta.
+  mostra informação escondida. Ele só desenha uma figura na tela, pergunta
+  ao Windows onde está a janela do jogo (como fazem programas de gravação,
+  por exemplo o OBS) e consulta a API oficial que o próprio LoL oferece
+  durante a partida. Mesmo assim, quem decide o que é permitido é a Riot,
+  e as regras podem mudar. Use por sua conta.
 
 * Quero voltar tudo ao padrão.
   Apague o arquivo %APPDATA%\MolduraFocoLoL\config.txt (cole esse endereço

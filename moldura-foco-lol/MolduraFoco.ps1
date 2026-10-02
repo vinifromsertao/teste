@@ -14,9 +14,12 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using WinTimer = System.Windows.Forms.Timer;
 
@@ -114,6 +117,8 @@ namespace MolduraFoco
 
     // Tamanho e posição são guardados como fração da altura da tela, porque o
     // campeão aparece maior ou menor conforme a resolução do jogo.
+    // Há uma posição para cada lado do mapa: com a câmera em "contrapeso por
+    // lado" o campeão fica num ponto diferente da tela no lado azul e no vermelho.
     internal sealed class Settings
     {
         public const double DefaultSize = 0.065;
@@ -121,11 +126,12 @@ namespace MolduraFoco
         public const double DefaultOffsetY = -0.025;
 
         public bool OnlyInGame = false;
+        public bool HideWhenDead = true;
         public int Shape = 0;
         public int ColorIndex = 0;
         public double Size = DefaultSize;
-        public double OffsetX = DefaultOffsetX;
-        public double OffsetY = DefaultOffsetY;
+        public double[] OffsetX = { DefaultOffsetX, DefaultOffsetX };
+        public double[] OffsetY = { DefaultOffsetY, DefaultOffsetY };
         public int Thickness = 1;
         public int Opacity = 85;
         public bool Pulse = false;
@@ -144,6 +150,7 @@ namespace MolduraFoco
         public static Settings Load()
         {
             Settings s = new Settings();
+            bool hasRed = false;
             try
             {
                 if (!File.Exists(FilePath)) return s;
@@ -159,8 +166,11 @@ namespace MolduraFoco
                         case "Shape": s.Shape = ReadInt(value, s.Shape, 0, Palette.ShapeNames.Length - 1); break;
                         case "Color": s.ColorIndex = ReadInt(value, s.ColorIndex, 0, Palette.Colors.Length - 1); break;
                         case "Size": s.Size = ReadDouble(value, s.Size, 0.02, 0.3); break;
-                        case "OffsetX": s.OffsetX = ReadDouble(value, s.OffsetX, -0.45, 0.45); break;
-                        case "OffsetY": s.OffsetY = ReadDouble(value, s.OffsetY, -0.45, 0.45); break;
+                        case "HideWhenDead": s.HideWhenDead = value == "1"; break;
+                        case "OffsetX": s.OffsetX[0] = ReadDouble(value, s.OffsetX[0], -0.45, 0.45); break;
+                        case "OffsetY": s.OffsetY[0] = ReadDouble(value, s.OffsetY[0], -0.45, 0.45); break;
+                        case "RedOffsetX": s.OffsetX[1] = ReadDouble(value, s.OffsetX[1], -0.45, 0.45); hasRed = true; break;
+                        case "RedOffsetY": s.OffsetY[1] = ReadDouble(value, s.OffsetY[1], -0.45, 0.45); hasRed = true; break;
                         case "Thickness": s.Thickness = ReadInt(value, s.Thickness, 0, Palette.ThicknessAt1080p.Length - 1); break;
                         case "Opacity": s.Opacity = ReadInt(value, s.Opacity, 20, 100); break;
                         case "Pulse": s.Pulse = value == "1"; break;
@@ -171,6 +181,13 @@ namespace MolduraFoco
             catch
             {
                 // Arquivo de configuração estragado: segue com os valores padrão.
+            }
+
+            // Configuração da versão anterior, com uma posição só: vale para os dois lados.
+            if (!hasRed)
+            {
+                s.OffsetX[1] = s.OffsetX[0];
+                s.OffsetY[1] = s.OffsetY[0];
             }
             return s;
         }
@@ -185,8 +202,11 @@ namespace MolduraFoco
                 sb.AppendLine("Shape=" + Shape.ToString(inv));
                 sb.AppendLine("Color=" + ColorIndex.ToString(inv));
                 sb.AppendLine("Size=" + Size.ToString("0.0000", inv));
-                sb.AppendLine("OffsetX=" + OffsetX.ToString("0.0000", inv));
-                sb.AppendLine("OffsetY=" + OffsetY.ToString("0.0000", inv));
+                sb.AppendLine("HideWhenDead=" + (HideWhenDead ? "1" : "0"));
+                sb.AppendLine("OffsetX=" + OffsetX[0].ToString("0.0000", inv));
+                sb.AppendLine("OffsetY=" + OffsetY[0].ToString("0.0000", inv));
+                sb.AppendLine("RedOffsetX=" + OffsetX[1].ToString("0.0000", inv));
+                sb.AppendLine("RedOffsetY=" + OffsetY[1].ToString("0.0000", inv));
                 sb.AppendLine("Thickness=" + Thickness.ToString(inv));
                 sb.AppendLine("Opacity=" + Opacity.ToString(inv));
                 sb.AppendLine("Pulse=" + (Pulse ? "1" : "0"));
@@ -338,15 +358,15 @@ namespace MolduraFoco
             }
         }
 
-        public void Place(Rectangle area)
+        public void Place(Rectangle area, double offsetX, double offsetY)
         {
             float h = area.Height;
             radius = Math.Max(10f, (float)(settings.Size * h));
             thickness = Math.Max(2f, (float)Math.Round(Palette.ThicknessAt1080p[settings.Thickness] * h / 1080f));
 
             int half = (int)Math.Ceiling(radius * 1.9f + thickness * 2 + 6);
-            int cx = area.Left + area.Width / 2 + (int)Math.Round(settings.OffsetX * h);
-            int cy = area.Top + area.Height / 2 + (int)Math.Round(settings.OffsetY * h);
+            int cx = area.Left + area.Width / 2 + (int)Math.Round(offsetX * h);
+            int cy = area.Top + area.Height / 2 + (int)Math.Round(offsetY * h);
             Rectangle bounds = new Rectangle(cx - half, cy - half, half * 2, half * 2);
             if (Bounds != bounds) Bounds = bounds;
             Invalidate();
@@ -359,6 +379,122 @@ namespace MolduraFoco
             g.SmoothingMode = SmoothingMode.AntiAlias;
             Shapes.Draw(g, settings.Shape, ClientSize.Width / 2f, ClientSize.Height / 2f, radius, thickness,
                 Palette.Colors[settings.ColorIndex]);
+        }
+    }
+
+    // Consulta a API oficial que o próprio LoL abre no computador durante a
+    // partida (https://127.0.0.1:2999/liveclientdata). Ela informa o time de
+    // cada jogador e se ele está morto, mas não a posição do campeão na tela.
+    internal sealed class LiveGame
+    {
+        public const int NoGame = -1;
+        public const int Blue = 0;
+        public const int Red = 1;
+
+        volatile int side = NoGame;
+        volatile bool dead;
+        volatile bool running;
+        readonly JavaScriptSerializer json = new JavaScriptSerializer();
+
+        public int Side { get { return side; } }
+        public bool Dead { get { return dead; } }
+
+        public void Start()
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            running = true;
+            Thread thread = new Thread(Loop);
+            thread.IsBackground = true;
+            thread.Start();
+        }
+
+        public void Stop()
+        {
+            running = false;
+        }
+
+        void Loop()
+        {
+            while (running)
+            {
+                try
+                {
+                    Poll();
+                }
+                catch
+                {
+                    // Sem partida em andamento a API simplesmente não responde.
+                    side = NoGame;
+                    dead = false;
+                }
+                Thread.Sleep(side == NoGame ? 3000 : 1000);
+            }
+        }
+
+        void Poll()
+        {
+            string me = json.DeserializeObject(Get("activeplayername")) as string;
+            object[] players = json.DeserializeObject(Get("playerlist")) as object[];
+            Dictionary<string, object> mine = FindPlayer(players, me, true) ?? FindPlayer(players, me, false);
+            if (mine == null)
+            {
+                side = NoGame;
+                dead = false;
+                return;
+            }
+            side = Text(mine, "team") == "CHAOS" ? Red : Blue;
+            object isDead;
+            dead = mine.TryGetValue("isDead", out isDead) && isDead is bool && (bool)isDead;
+        }
+
+        static Dictionary<string, object> FindPlayer(object[] players, string me, bool exact)
+        {
+            if (players == null || string.IsNullOrEmpty(me)) return null;
+            foreach (object item in players)
+            {
+                Dictionary<string, object> p = item as Dictionary<string, object>;
+                if (p == null) continue;
+                string[] names = { Text(p, "riotId"), Text(p, "summonerName"), Text(p, "riotIdGameName") };
+                foreach (string name in names)
+                {
+                    if (string.IsNullOrEmpty(name)) continue;
+                    if (exact ? SameText(name, me) : SameText(BeforeTag(name), BeforeTag(me))) return p;
+                }
+            }
+            return null;
+        }
+
+        static string Text(Dictionary<string, object> p, string key)
+        {
+            object v;
+            return p.TryGetValue(key, out v) ? v as string : null;
+        }
+
+        static string BeforeTag(string name)
+        {
+            int hash = name.IndexOf('#');
+            return hash >= 0 ? name.Substring(0, hash) : name;
+        }
+
+        static bool SameText(string a, string b)
+        {
+            return string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        static string Get(string path)
+        {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create("https://127.0.0.1:2999/liveclientdata/" + path);
+            request.Proxy = null;
+            request.Timeout = 1500;
+            request.ReadWriteTimeout = 1500;
+            // O jogo usa um certificado próprio da Riot; como o endereço é o do
+            // próprio computador (127.0.0.1), aceitar esse certificado é seguro.
+            request.ServerCertificateValidationCallback = delegate { return true; };
+            using (WebResponse response = request.GetResponse())
+            using (StreamReader reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+            {
+                return reader.ReadToEnd();
+            }
         }
     }
 
@@ -410,6 +546,7 @@ namespace MolduraFoco
         readonly OverlayForm overlay;
         readonly NotifyIcon tray;
         readonly HotkeyWindow hotkeys;
+        readonly LiveGame live = new LiveGame();
         readonly WinTimer trackTimer = new WinTimer();
         readonly WinTimer pulseTimer = new WinTimer();
         readonly WinTimer saveTimer = new WinTimer();
@@ -422,8 +559,9 @@ namespace MolduraFoco
         int ticks;
         double pulsePhase;
         Rectangle lastArea;
+        int lastSide = int.MinValue;
 
-        ToolStripMenuItem showItem, onlyInGameItem, pulseItem, monitorMenu;
+        ToolStripMenuItem statusItem, showItem, onlyInGameItem, hideWhenDeadItem, pulseItem, monitorMenu;
         readonly List<ToolStripMenuItem> shapeItems = new List<ToolStripMenuItem>();
         readonly List<ToolStripMenuItem> colorItems = new List<ToolStripMenuItem>();
         readonly List<ToolStripMenuItem> thicknessItems = new List<ToolStripMenuItem>();
@@ -455,6 +593,7 @@ namespace MolduraFoco
             saveTimer.Tick += delegate { if (dirty) { dirty = false; settings.Save(); } };
             saveTimer.Start();
 
+            live.Start();
             Refresh(true);
 
             string message = failed.Length == 0
@@ -477,14 +616,21 @@ namespace MolduraFoco
                 area = CurrentScreen().Bounds;
             }
 
+            // Lado do mapa informado pela API do jogo; fora de partida usa a posição do lado azul.
+            int side = live.Side;
+
             bool show = visible;
             if (show && settings.OnlyInGame)
                 show = game != IntPtr.Zero && Native.GetForegroundWindow() == game;
+            if (show && settings.HideWhenDead && side != LiveGame.NoGame && live.Dead)
+                show = false;
 
-            if (force || area != lastArea)
+            if (force || area != lastArea || side != lastSide)
             {
                 lastArea = area;
-                overlay.Place(area);
+                lastSide = side;
+                overlay.Place(area, settings.OffsetX[PositionIndex], settings.OffsetY[PositionIndex]);
+                tray.Text = "Moldura de Foco (LoL) - " + SideText(side);
             }
 
             if (show && !overlay.Visible) overlay.Show();
@@ -497,6 +643,19 @@ namespace MolduraFoco
 
             pulseTimer.Enabled = show && settings.Pulse;
             if (!settings.Pulse) SetOpacityIfChanged(BaseOpacity);
+        }
+
+        // Qual das duas posições guardadas está em uso: 0 = lado azul, 1 = lado vermelho.
+        int PositionIndex
+        {
+            get { return lastSide == LiveGame.Red ? 1 : 0; }
+        }
+
+        static string SideText(int side)
+        {
+            if (side == LiveGame.Blue) return "lado azul";
+            if (side == LiveGame.Red) return "lado vermelho";
+            return "nenhuma partida";
         }
 
         void SetOpacityIfChanged(double value)
@@ -558,8 +717,9 @@ namespace MolduraFoco
         void Move(int dx, int dy)
         {
             visible = true;
-            settings.OffsetX = Clamp(settings.OffsetX + dx * MoveStep, -0.45, 0.45);
-            settings.OffsetY = Clamp(settings.OffsetY + dy * MoveStep, -0.45, 0.45);
+            int i = PositionIndex;
+            settings.OffsetX[i] = Clamp(settings.OffsetX[i] + dx * MoveStep, -0.45, 0.45);
+            settings.OffsetY[i] = Clamp(settings.OffsetY[i] + dy * MoveStep, -0.45, 0.45);
             Changed();
         }
 
@@ -577,13 +737,14 @@ namespace MolduraFoco
         void SetMonitor(int index) { settings.Monitor = index; Changed(); }
         void TogglePulse() { visible = true; settings.Pulse = !settings.Pulse; Changed(); }
         void ToggleOnlyInGame() { settings.OnlyInGame = !settings.OnlyInGame; Changed(); }
+        void ToggleHideWhenDead() { settings.HideWhenDead = !settings.HideWhenDead; Changed(); }
 
         void ResetPosition()
         {
             visible = true;
             settings.Size = Settings.DefaultSize;
-            settings.OffsetX = Settings.DefaultOffsetX;
-            settings.OffsetY = Settings.DefaultOffsetY;
+            settings.OffsetX[PositionIndex] = Settings.DefaultOffsetX;
+            settings.OffsetY[PositionIndex] = Settings.DefaultOffsetY;
             Changed();
         }
 
@@ -630,10 +791,17 @@ namespace MolduraFoco
         {
             ContextMenuStrip menu = new ContextMenuStrip();
 
+            statusItem = new ToolStripMenuItem();
+            statusItem.Enabled = false;
+            menu.Items.Add(statusItem);
+            menu.Items.Add(new ToolStripSeparator());
+
             showItem = Item("Mostrar moldura", "Ctrl+Alt+F", delegate { ToggleVisible(); });
             onlyInGameItem = Item("Mostrar só durante a partida", null, delegate { ToggleOnlyInGame(); });
+            hideWhenDeadItem = Item("Esconder quando o campeão morrer", null, delegate { ToggleHideWhenDead(); });
             menu.Items.Add(showItem);
             menu.Items.Add(onlyInGameItem);
+            menu.Items.Add(hideWhenDeadItem);
             menu.Items.Add(new ToolStripSeparator());
 
             ToolStripMenuItem shapeMenu = new ToolStripMenuItem("Forma");
@@ -695,7 +863,7 @@ namespace MolduraFoco
             menu.Items.Add(monitorMenu);
 
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(Item("Voltar à posição e tamanho iniciais", "Ctrl+Alt+R", delegate { ResetPosition(); }));
+            menu.Items.Add(Item("Voltar à posição e tamanho iniciais (deste lado)", "Ctrl+Alt+R", delegate { ResetPosition(); }));
             menu.Items.Add(Item("Ver atalhos de teclado...", null, delegate { ShowHelp(); }));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(Item("Sair", null, delegate { Quit(); }));
@@ -722,8 +890,13 @@ namespace MolduraFoco
 
         void RefreshMenu()
         {
+            int side = live.Side;
+            statusItem.Text = side == LiveGame.NoGame
+                ? "Nenhuma partida em andamento"
+                : "Partida detectada: " + SideText(side) + (live.Dead ? " (campeão morto)" : "");
             showItem.Checked = visible;
             onlyInGameItem.Checked = settings.OnlyInGame;
+            hideWhenDeadItem.Checked = settings.HideWhenDead;
             pulseItem.Checked = settings.Pulse;
             for (int i = 0; i < shapeItems.Count; i++) shapeItems[i].Checked = i == settings.Shape;
             for (int i = 0; i < colorItems.Count; i++) colorItems[i].Checked = i == settings.ColorIndex;
@@ -760,7 +933,9 @@ namespace MolduraFoco
                 "Ctrl + Alt + C  —  trocar a cor\n" +
                 "Ctrl + Alt + P  —  ligar / desligar o efeito de pulsar\n" +
                 "Ctrl + Alt + R  —  voltar à posição e ao tamanho iniciais\n\n" +
-                "Dica: jogue com a câmera travada (tecla Y) e o jogo no modo \"Sem bordas\".\n\n" +
+                "A moldura guarda uma posição para o lado azul e outra para o vermelho e troca\n" +
+                "sozinha conforme o lado da partida. Ajuste cada lado uma vez, com a câmera travada.\n\n" +
+                "Dica: deixe o jogo no modo \"Sem bordas\".\n\n" +
                 "Para fechar: botão direito no ícone perto do relógio  →  Sair.",
                 "Moldura de Foco — atalhos", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -829,6 +1004,7 @@ namespace MolduraFoco
         {
             if (closed) return;
             closed = true;
+            live.Stop();
             trackTimer.Stop();
             pulseTimer.Stop();
             saveTimer.Stop();
@@ -852,8 +1028,11 @@ namespace MolduraFoco
 '@
 
 try {
-    Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-    Add-Type -TypeDefinition $codigo -Language CSharp -ReferencedAssemblies System.Windows.Forms, System.Drawing
+    Add-Type -AssemblyName System.Windows.Forms, System.Drawing, System.Web.Extensions
+    # Caminho completo de cada biblioteca, para o compilador encontrá-las com certeza.
+    $referencias = [System.Windows.Forms.Form], [System.Drawing.Color], [System.Web.Script.Serialization.JavaScriptSerializer] |
+        ForEach-Object { $_.Assembly.Location }
+    Add-Type -TypeDefinition $codigo -Language CSharp -ReferencedAssemblies $referencias
     [MolduraFoco.Program]::Run()
 }
 catch {
