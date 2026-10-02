@@ -66,9 +66,10 @@ solta. Quando o campeão sai da tela, a moldura some; quando ele aparece
 de novo, ela volta.
 
 Para ligar (só na primeira vez):
-1. Numa partida (pode ser no modo Prática), trave a câmera e confira se a
-   moldura está em cima do campeão.
-2. Fique parado, com a vida cheia e longe de outros campeões.
+1. Numa partida (pode ser no modo Prática), coloque a moldura em cima do
+   campeão ou da barra de vida dele (Ctrl + Alt + setas). A moldura vai
+   seguir o campeão mantendo essa mesma posição.
+2. Fique parado, de preferência com a vida cheia e longe de outros campeões.
 3. Aperte Ctrl + Alt + B. Embaixo da moldura deve aparecer
    "Barra aprendida! Seguindo".
 Pronto: a partir daí, Ctrl + Alt + S liga e desliga o modo seguir.
@@ -76,8 +77,15 @@ Com ele ligado, Ctrl + Alt + setas ajustam onde a moldura fica em relação
 ao campeão.
 
 Se aparecer "Não achei a barra de vida", confira os passos acima e tente
-de novo. Se você mudar a aparência das barras de vida (por exemplo, o modo
-para daltônicos), repita o Ctrl + Alt + B.
+de novo. Se você mudar a resolução do jogo ou a aparência das barras de
+vida (por exemplo, o modo para daltônicos), repita o Ctrl + Alt + B.
+
+Cada Ctrl + Alt + B guarda a imagem que a moldura viu. No menu do ícone,
+"Abrir a pasta das capturas" mostra os arquivos captura-tela.png e
+captura-info.txt. Se algo não funcionar, mande esses dois arquivos para
+quem está te ajudando: eles mostram exatamente o que a moldura enxergou.
+Se aparecer "Não consegui ver o jogo", a imagem veio vazia: confira se o
+jogo está no modo "Sem bordas".
 
 Limites deste modo:
 - Ele foi testado só com imagens simuladas parecidas com o jogo. No jogo

@@ -100,6 +100,7 @@ namespace MolduraFoco
         public struct POINT { public int X, Y; }
 
         [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+        [DllImport("user32.dll")] public static extern bool IsProcessDPIAware();
         [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
         [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
@@ -176,7 +177,7 @@ namespace MolduraFoco
         public bool Follow = false;
         public BarModel Bar = null;
 
-        static string Folder
+        public static string Folder
         {
             get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MolduraFocoLoL"); }
         }
@@ -264,6 +265,9 @@ namespace MolduraFoco
                     sb.AppendLine("BarOffsetX=" + Bar.OffsetX.ToString("0.000000", inv));
                     sb.AppendLine("BarOffsetY=" + Bar.OffsetY.ToString("0.000000", inv));
                     sb.AppendLine("BarEdges=" + Bar.EdgeAbove.ToString(inv) + "," + Bar.EdgeBelow.ToString(inv) + "," + Bar.EdgeLeft.ToString(inv));
+                    if (Bar.Template != null)
+                        sb.AppendLine("BarTemplate=" + Bar.TemplateWidth.ToString(inv) + "," + Bar.TemplateHeight.ToString(inv) + ","
+                            + Bar.TemplateAreaHeight.ToString(inv) + "," + Convert.ToBase64String(Bar.Template));
                 }
                 Directory.CreateDirectory(Folder);
                 File.WriteAllText(FilePath, sb.ToString());
@@ -294,6 +298,24 @@ namespace MolduraFoco
                 case "BarWidth": b.Width = ReadDouble(value, 0, 0, 0.5); break;
                 case "BarOffsetX": b.OffsetX = ReadDouble(value, 0, -0.5, 0.5); break;
                 case "BarOffsetY": b.OffsetY = ReadDouble(value, 0, -0.5, 0.5); break;
+                case "BarTemplate":
+                    string[] t = value.Split(',');
+                    if (t.Length == 4)
+                    {
+                        try
+                        {
+                            b.TemplateWidth = ReadInt(t[0], 0, 0, 64);
+                            b.TemplateHeight = ReadInt(t[1], 0, 0, 128);
+                            b.TemplateAreaHeight = ReadInt(t[2], 0, 0, 10000);
+                            b.Template = Convert.FromBase64String(t[3]);
+                            if (b.Template.Length != b.TemplateWidth * b.TemplateHeight * 3) b.Template = null;
+                        }
+                        catch
+                        {
+                            b.Template = null;
+                        }
+                    }
+                    break;
                 case "BarEdges":
                     string[] edges = value.Split(',');
                     if (edges.Length == 3)
@@ -637,6 +659,15 @@ namespace MolduraFoco
         // Tom (0 a 255) da moldura escura em volta da barra: em cima, embaixo e à esquerda
         // (onde fica o quadradinho do nível). -1 quando não há borda escura para conferir.
         public int EdgeAbove = -1, EdgeBelow = -1, EdgeLeft = -1;
+        // "Carimbo" do canto esquerdo da barra (quadradinho do nível, borda e começo da vida),
+        // em cores, guardado na resolução em que foi aprendido. Não muda quando a vida cai.
+        public byte[] Template;
+        public int TemplateWidth, TemplateHeight, TemplateAreaHeight;
+
+        public const int TemplateLeft = 8;   // colunas à esquerda do começo da barra
+        public const int TemplateRight = 2;  // colunas do começo da barra
+        public const int TemplateAbove = 5;  // linhas acima da faixa colorida
+        public const int TemplateBelow = 2;  // linhas abaixo da faixa colorida
 
         public bool Valid
         {
@@ -658,7 +689,8 @@ namespace MolduraFoco
     // A busca usa o canto esquerdo da barra, que não sai do lugar quando a vida diminui.
     internal static class BarFinder
     {
-        const int MaxGap = 2;          // os risquinhos da barra (a cada 100 de vida) têm 1 ou 2 pixels
+        const int MaxGap = 3;          // pixels diferentes que a barra pode "pular" (risquinhos de vida)
+        const int MaxSoftGap = 5;      // idem, quando são a mesma cor só que mais escura
         const int EdgeTolerance = 30;  // diferença de tom aceita na moldura escura da barra
         const int DarkEdge = 70;       // abaixo disso o tom conta como moldura escura
 
@@ -682,7 +714,19 @@ namespace MolduraFoco
         {
             int max = Math.Max(px[i + 2], Math.Max(px[i + 1], px[i]));
             int min = Math.Min(px[i + 2], Math.Min(px[i + 1], px[i]));
-            return max >= 110 && max - min >= 70;
+            return max >= 100 && max - min >= 60;
+        }
+
+        // Mesma cor, só que mais escura ou um pouco mais clara: é o que acontece onde os
+        // risquinhos de vida passam por cima da barra. Compara as proporções entre vermelho,
+        // verde e azul, que não mudam quando a cor só escurece.
+        static bool SameHue(byte[] px, int i, int r, int g, int b)
+        {
+            int pr = px[i + 2], pg = px[i + 1], pb = px[i];
+            int pm = Math.Max(pr, Math.Max(pg, pb)), cm = Math.Max(r, Math.Max(g, b));
+            if (cm == 0 || pm * 10 < cm * 3 || pm * 10 > cm * 12) return false;
+            int diff = Math.Abs(pr * cm - r * pm) + Math.Abs(pg * cm - g * pm) + Math.Abs(pb * cm - b * pm);
+            return diff * 100 <= 15 * pm * cm;
         }
 
         static bool Close(byte[] px, int i, int j, int tolerance)
@@ -700,12 +744,12 @@ namespace MolduraFoco
             int barH = Math.Max(2, (int)Math.Round(m.Height * areaHeight));
             int barW = Math.Max(8, (int)Math.Round(m.Width * areaHeight));
             // Com pouca vida sobra só um pedacinho colorido. Se a moldura escura em volta foi
-            // aprendida (em cima, embaixo e à esquerda), até 2 pixels bastam para reconhecer a barra.
-            bool strongEdges = m.EdgeAbove >= 0 && m.EdgeBelow >= 0 && m.EdgeLeft >= 0;
-            int minLen = strongEdges ? 2 : Math.Max(4, barW / 12);
+            // aprendida (pelo menos embaixo e à esquerda), uns poucos pixels bastam para reconhecer a barra.
+            int edges = (m.EdgeAbove >= 0 ? 1 : 0) + (m.EdgeBelow >= 0 ? 1 : 0) + (m.EdgeLeft >= 0 ? 1 : 0);
+            int minLen = edges == 3 ? 2 : edges == 2 ? 3 : Math.Max(4, barW / 12);
             int maxLen = barW * 5 / 2;
             int near = Math.Max(8, (int)(areaHeight * 0.035));
-            int heightTolerance = Math.Max(2, barH * 35 / 100);
+            int heightTolerance = Math.Max(3, barH / 2);
             int rowStep = barH >= 5 ? 2 : 1;
             long bestScore = long.MaxValue;
             bool found = false;
@@ -720,8 +764,9 @@ namespace MolduraFoco
                     int start = x, last = x, gap = 0;
                     for (x = x + 1; x < w; x++)
                     {
-                        if (Matches(px, row + x * 4, m)) { last = x; gap = 0; }
-                        else if (++gap > MaxGap) break;
+                        int k = row + x * 4;
+                        if (Matches(px, k, m)) { last = x; gap = 0; }
+                        else if (++gap > (SameHue(px, k, m.R, m.G, m.B) ? MaxSoftGap : MaxGap)) break;
                     }
                     x = last + 1;
 
@@ -735,17 +780,19 @@ namespace MolduraFoco
                     int top, bottom;
                     VerticalExtent(px, stride, h, m, start, last, y, out top, out bottom);
                     if (Math.Abs(bottom - top + 1 - barH) > heightTolerance) continue;
-                    if (!EdgeMatches(m.EdgeAbove, EdgeRow(px, stride, h, start, last, top - 1, top - 2))) continue;
-                    if (!EdgeMatches(m.EdgeBelow, EdgeRow(px, stride, h, start, last, bottom + 1, bottom + 2))) continue;
+                    if (!EdgeMatches(m.EdgeAbove, EdgeRow(px, stride, h, start, last, top - 1, -1))) continue;
+                    if (!EdgeMatches(m.EdgeBelow, EdgeRow(px, stride, h, start, last, bottom + 1, 1))) continue;
                     if (!EdgeMatches(m.EdgeLeft, EdgeColumn(px, stride, w, start, top, bottom))) continue;
+                    int ax, ay;
+                    if (!TemplateMatches(px, stride, w, h, m, areaHeight, start, top, out ax, out ay)) continue;
 
-                    long dx = start - expectedX, dy = top - expectedY;
+                    long dx = ax - expectedX, dy = ay - expectedY;
                     long score = dx * dx + dy * dy;
                     if (score < bestScore)
                     {
                         bestScore = score;
-                        best.X = start;
-                        best.Y = top;
+                        best.X = ax;
+                        best.Y = ay;
                         best.Length = len;
                         found = true;
                     }
@@ -775,21 +822,96 @@ namespace MolduraFoco
             if (b > bottom) bottom = b;
         }
 
+        const int TemplateTolerance = 60;   // diferença média aceita por pixel (somando as três cores)
+
+        public static bool TemplateApplies(BarModel m, double areaHeight)
+        {
+            return m.Template != null && Math.Abs(m.TemplateAreaHeight - (int)Math.Round(areaHeight)) <= 1;
+        }
+
+        // Confere o "carimbo" do canto esquerdo da barra, com folga de 1 pixel para cada lado,
+        // e devolve em (ax, ay) o canto onde ele encaixa melhor. Só vale na resolução em que foi aprendido.
+        static bool TemplateMatches(byte[] px, int stride, int w, int h, BarModel m, double areaHeight, int start, int top,
+                                    out int ax, out int ay)
+        {
+            ax = start;
+            ay = top;
+            if (!TemplateApplies(m, areaHeight)) return true;
+            long best = long.MaxValue;
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    long d = TemplateDistance(px, stride, w, h, m, start + dx, top + dy);
+                    if (d < best)
+                    {
+                        best = d;
+                        ax = start + dx;
+                        ay = top + dy;
+                    }
+                }
+            }
+            return best <= (long)TemplateTolerance * m.TemplateWidth * m.TemplateHeight;
+        }
+
+        static long TemplateDistance(byte[] px, int stride, int w, int h, BarModel m, int start, int top)
+        {
+            int x0 = start - BarModel.TemplateLeft, y0 = top - BarModel.TemplateAbove;
+            if (x0 < 0 || y0 < 0 || x0 + m.TemplateWidth > w || y0 + m.TemplateHeight > h) return long.MaxValue;
+            long total = 0;
+            int k = 0;
+            for (int y = 0; y < m.TemplateHeight; y++)
+            {
+                int row = (y0 + y) * stride + x0 * 4;
+                for (int x = 0; x < m.TemplateWidth; x++, k += 3)
+                {
+                    int i = row + x * 4;
+                    total += Math.Abs(px[i + 2] - m.Template[k]) + Math.Abs(px[i + 1] - m.Template[k + 1]) + Math.Abs(px[i] - m.Template[k + 2]);
+                }
+            }
+            return total;
+        }
+
+        static byte[] CopyTemplate(byte[] px, int stride, int w, int h, int start, int top, int width, int height)
+        {
+            int x0 = start - BarModel.TemplateLeft, y0 = top - BarModel.TemplateAbove;
+            if (x0 < 0 || y0 < 0 || x0 + width > w || y0 + height > h) return null;
+            byte[] t = new byte[width * height * 3];
+            int k = 0;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++, k += 3)
+                {
+                    int i = (y0 + y) * stride + (x0 + x) * 4;
+                    t[k] = px[i + 2];
+                    t[k + 1] = px[i + 1];
+                    t[k + 2] = px[i];
+                }
+            }
+            return t;
+        }
+
         static bool EdgeMatches(int learned, int seen)
         {
             return learned < 0 || seen < 0 || Math.Abs(seen - learned) <= EdgeTolerance;
         }
 
-        // Tom da moldura logo acima (ou abaixo) da barra: o mais escuro entre as duas linhas
-        // vizinhas, medido em três colunas, ficando com o do meio. -1 se sair da imagem.
-        static int EdgeRow(byte[] px, int stride, int h, int start, int last, int y1, int y2)
+        // Tom da moldura logo acima (dir = -1) ou abaixo (dir = 1) da barra: o mais escuro entre as
+        // três linhas vizinhas, medido em três colunas, ficando com o do meio. -1 se sair da imagem.
+        static int EdgeRow(byte[] px, int stride, int h, int start, int last, int y1, int dir)
         {
-            if (y1 < 0 || y1 >= h || y2 < 0 || y2 >= h) return -1;
-            int a = Math.Min(Luma(px, y1 * stride + start * 4), Luma(px, y2 * stride + start * 4));
+            int y3 = y1 + 2 * dir;
+            if (y1 < 0 || y1 >= h || y3 < 0 || y3 >= h) return -1;
             int mid = (start + last) / 2;
-            int b = Math.Min(Luma(px, y1 * stride + mid * 4), Luma(px, y2 * stride + mid * 4));
-            int c = Math.Min(Luma(px, y1 * stride + last * 4), Luma(px, y2 * stride + last * 4));
-            return Median(a, b, c);
+            return Median(DarkestOf3(px, stride, start, y1, dir), DarkestOf3(px, stride, mid, y1, dir), DarkestOf3(px, stride, last, y1, dir));
+        }
+
+        static int DarkestOf3(byte[] px, int stride, int x, int y1, int dir)
+        {
+            int a = Luma(px, y1 * stride + x * 4);
+            int b = Luma(px, (y1 + dir) * stride + x * 4);
+            int c = Luma(px, (y1 + 2 * dir) * stride + x * 4);
+            return Math.Min(a, Math.Min(b, c));
         }
 
         // Tom logo à esquerda da barra (quadradinho do nível), em três alturas.
@@ -850,11 +972,13 @@ namespace MolduraFoco
                     int i = row + x * 4;
                     if (!IsVivid(px, i) || !Close(px, i, i + 4, 40) || !Close(px, i, i + 8, 40)) { x++; continue; }
                     int reference = i + 4;
+                    int rr = px[reference + 2], rg = px[reference + 1], rb = px[reference];
                     int start = x, last = x, gap = 0;
                     for (x = x + 1; x <= x1; x++)
                     {
-                        if (Close(px, row + x * 4, reference, 45)) { last = x; gap = 0; }
-                        else if (++gap > MaxGap) break;
+                        int k = row + x * 4;
+                        if (Close(px, k, reference, 45)) { last = x; gap = 0; }
+                        else if (++gap > (SameHue(px, k, rr, rg, rb) ? MaxSoftGap : MaxGap)) break;
                     }
                     x = last + 1;
                     if (last - start + 1 >= minLen) AddRun(blobs, px, y, start, last, reference);
@@ -865,13 +989,15 @@ namespace MolduraFoco
             // Manchas do terreno ou de feitiços não passam nesses testes.
             int[] bar = null;
             long bestScore = 0;
+            List<int[]> candidates = new List<int[]>();
             foreach (int[] b in blobs)
             {
                 int rows = b[3] - b[2] + 1, width = b[1] - b[0] + 1;
                 if (rows < 3 || width < rows * 3) continue;
-                if (b[5] - b[0] > 2 || b[1] - b[6] > 4) continue;
+                if (b[5] - b[0] > 3 || b[1] - b[6] > 6) continue;
                 if (b[0] <= x0 + 1 || b[1] >= x1 - 1 || b[2] <= y0 || b[3] >= y1) continue;
                 if (Math.Abs((b[0] + b[1]) / 2 - cx) > areaHeight * 0.12) continue;
+                candidates.Add(b);
                 long score = (long)rows * width;
                 if (DarkLine(px, stride, w, h, b[0], b[1], b[2] - 1, b[2] - 2)
                     && DarkLine(px, stride, w, h, b[0], b[1], b[3] + 1, b[3] + 2)) score *= 3;
@@ -879,20 +1005,39 @@ namespace MolduraFoco
             }
             if (bar == null) return null;
 
-            // Cor média da linha do meio da faixa.
-            int middle = (bar[2] + bar[3]) / 2;
-            long r = 0, g = 0, bl = 0, n = 0;
-            for (int x = bar[0] + 2; x <= bar[1] - 2; x++)
+            // A barra de vida fica logo acima da barra de mana (ou energia), alinhada à esquerda.
+            // Se houver uma faixa assim logo acima da escolhida, fica com a de cima.
+            bool climbed = true;
+            while (climbed)
             {
-                int i = middle * stride + x * 4;
-                bl += px[i]; g += px[i + 1]; r += px[i + 2]; n++;
+                climbed = false;
+                foreach (int[] b in candidates)
+                {
+                    if (b != bar && Math.Abs(b[0] - bar[0]) <= 3 && b[3] < bar[2] && bar[2] - b[3] <= areaHeight * 0.02)
+                    {
+                        bar = b;
+                        climbed = true;
+                        break;
+                    }
+                }
             }
-            if (n == 0) return null;
+
+            // Cor da linha do meio da faixa: a mediana, para os risquinhos escuros não puxarem a cor para baixo.
+            int middle = (bar[2] + bar[3]) / 2;
+            int n = bar[1] - bar[0] - 3;
+            if (n < 3) return null;
+            int[] rs = new int[n], gs = new int[n], bs = new int[n];
+            for (int k = 0; k < n; k++)
+            {
+                int i = middle * stride + (bar[0] + 2 + k) * 4;
+                bs[k] = px[i]; gs[k] = px[i + 1]; rs[k] = px[i + 2];
+            }
+            Array.Sort(rs); Array.Sort(gs); Array.Sort(bs);
 
             BarModel m = new BarModel();
-            m.R = (int)(r / n);
-            m.G = (int)(g / n);
-            m.B = (int)(bl / n);
+            m.R = rs[n / 2];
+            m.G = gs[n / 2];
+            m.B = bs[n / 2];
 
             int top, bottom;
             VerticalExtent(px, stride, h, m, bar[0] + 2, bar[1] - 2, middle, out top, out bottom);
@@ -900,17 +1045,45 @@ namespace MolduraFoco
             if (thickness < 3 || thickness > areaHeight * 0.03) return null;
             m.Height = thickness / areaHeight;
             m.Width = (bar[1] - bar[0] + 1) / areaHeight;
-            m.EdgeAbove = LearnEdge(EdgeRow(px, stride, h, bar[0] + 2, bar[1] - 2, top - 1, top - 2));
-            m.EdgeBelow = LearnEdge(EdgeRow(px, stride, h, bar[0] + 2, bar[1] - 2, bottom + 1, bottom + 2));
+            m.EdgeAbove = LearnEdge(EdgeRow(px, stride, h, bar[0] + 2, bar[1] - 2, top - 1, -1));
+            m.EdgeBelow = LearnEdge(EdgeRow(px, stride, h, bar[0] + 2, bar[1] - 2, bottom + 1, 1));
             m.EdgeLeft = LearnEdge(EdgeColumn(px, stride, w, bar[0], top, bottom));
 
             // Confere que a busca normal encontra essa mesma barra e guarda a distância até o campeão.
             BarHit hit;
             if (!Find(px, stride, w, h, m, areaHeight, bar[0], top, false, Rectangle.Empty, out hit)) return null;
             if (Math.Abs(hit.X - bar[0]) > 6 || Math.Abs(hit.Y - top) > 3) return null;
+
+            // Guarda o carimbo do canto esquerdo e confere que a busca continua achando a barra com ele.
+            m.TemplateWidth = BarModel.TemplateLeft + BarModel.TemplateRight;
+            m.TemplateHeight = BarModel.TemplateAbove + thickness + BarModel.TemplateBelow;
+            m.Template = CopyTemplate(px, stride, w, h, hit.X, hit.Y, m.TemplateWidth, m.TemplateHeight);
+            m.TemplateAreaHeight = (int)Math.Round(areaHeight);
+            BarHit check;
+            if (m.Template != null && (!Find(px, stride, w, h, m, areaHeight, hit.X, hit.Y, false, Rectangle.Empty, out check)
+                                       || check.X != hit.X || check.Y != hit.Y)) return null;
             m.OffsetX = (cx - hit.X) / areaHeight;
             m.OffsetY = (cy - hit.Y) / areaHeight;
             return m;
+        }
+
+        // Imagem praticamente de uma cor só (por exemplo, toda preta): a captura não pegou o jogo.
+        public static bool LooksBlank(byte[] px, int stride, int w, int h)
+        {
+            long sum = 0, sumSq = 0, n = 0;
+            for (int y = 0; y < h; y += 4)
+            {
+                for (int x = 0; x < w; x += 4)
+                {
+                    int l = Luma(px, y * stride + x * 4);
+                    sum += l;
+                    sumSq += l * l;
+                    n++;
+                }
+            }
+            if (n == 0) return true;
+            double mean = (double)sum / n;
+            return (double)sumSq / n - mean * mean < 9;   // desvio menor que 3 tons
         }
 
         static void AddRun(List<int[]> blobs, byte[] px, int y, int start, int last, int reference)
@@ -971,18 +1144,81 @@ namespace MolduraFoco
             bitmap = null;
         }
 
-        // Aprende a barra de vida olhando a tela em volta de onde o campeão está agora.
-        public static BarModel LearnBar(Rectangle area, Point champion)
+        // Guarda a imagem da área do jogo e um resumo, para dar para ver o que a moldura
+        // enxergou ao tentar aprender a barra de vida (pasta de configuração da moldura).
+        public static void SaveSnapshot(Rectangle area, Point champion, BarModel learned, string problem)
         {
+            try
+            {
+                Directory.CreateDirectory(Settings.Folder);
+                using (Bitmap bmp = new Bitmap(area.Width, area.Height, PixelFormat.Format32bppArgb))
+                {
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        g.CopyFromScreen(area.Left, area.Top, 0, 0, area.Size, CopyPixelOperation.SourceCopy);
+                    }
+                    bmp.Save(Path.Combine(Settings.Folder, "captura-tela.png"), ImageFormat.Png);
+                }
+                CultureInfo inv = CultureInfo.InvariantCulture;
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Data: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", inv));
+                sb.AppendLine("Area do jogo: " + area.Left + "," + area.Top + " " + area.Width + "x" + area.Height);
+                sb.AppendLine("Centro da moldura na imagem: " + (champion.X - area.Left) + "," + (champion.Y - area.Top));
+                sb.AppendLine("Resultado: " + (learned != null ? "barra aprendida" : problem));
+                // Escala do Windows: se o ajuste de escala não estiver ativo, a imagem capturada
+                // pode não bater com o lugar onde a moldura aparece.
+                bool dpiAware = false;
+                float dpi = 96f;
+                try
+                {
+                    dpiAware = Native.IsProcessDPIAware();
+                    using (Graphics screen = Graphics.FromHwnd(IntPtr.Zero)) dpi = screen.DpiX;
+                }
+                catch
+                {
+                }
+                sb.AppendLine("Escala do Windows: " + Math.Round(dpi * 100 / 96) + "%, ajuste de escala da moldura: " + (dpiAware ? "ativo" : "INATIVO"));
+                sb.AppendLine("Tela principal: " + Screen.PrimaryScreen.Bounds.Width + "x" + Screen.PrimaryScreen.Bounds.Height);
+                if (learned != null)
+                {
+                    double h = area.Height;
+                    sb.AppendLine("Cor: " + learned.R + "," + learned.G + "," + learned.B);
+                    sb.AppendLine("Espessura: " + (learned.Height * h).ToString("0.0", inv) + " px, largura: " + (learned.Width * h).ToString("0.0", inv) + " px");
+                    sb.AppendLine("Bordas (cima/baixo/esquerda): " + learned.EdgeAbove + "/" + learned.EdgeBelow + "/" + learned.EdgeLeft);
+                }
+                File.WriteAllText(Path.Combine(Settings.Folder, "captura-info.txt"), sb.ToString());
+            }
+            catch
+            {
+                // Não conseguir salvar a imagem não atrapalha a moldura.
+            }
+        }
+
+        // Aprende a barra de vida olhando a tela em volta de onde o campeão está agora.
+        // Se não der, 'problem' explica: imagem vazia (o jogo não aparece na captura) ou barra não encontrada.
+        public static BarModel LearnBar(Rectangle area, Point champion, out string problem)
+        {
+            problem = null;
             double h = area.Height;
             Rectangle region = Rectangle.Intersect(area, new Rectangle(
                 champion.X - (int)(h * 0.2), champion.Y - (int)(h * 0.34), (int)(h * 0.4), (int)(h * 0.42)));
-            if (region.Width < 32 || region.Height < 32) return null;
+            if (region.Width < 32 || region.Height < 32)
+            {
+                problem = "moldura fora da area do jogo";
+                return null;
+            }
             using (ScreenGrabber grabber = new ScreenGrabber())
             {
                 int stride = grabber.Grab(region);
-                return BarFinder.Learn(grabber.Buffer, stride, region.Width, region.Height,
+                if (BarFinder.LooksBlank(grabber.Buffer, stride, region.Width, region.Height))
+                {
+                    problem = "imagem vazia";
+                    return null;
+                }
+                BarModel m = BarFinder.Learn(grabber.Buffer, stride, region.Width, region.Height,
                     champion.X - region.X, champion.Y - region.Y, h);
+                if (m == null) problem = "barra nao encontrada";
+                return m;
             }
         }
     }
@@ -1004,7 +1240,7 @@ namespace MolduraFoco
         // Usado só pela thread de busca.
         readonly ScreenGrabber grabber = new ScreenGrabber();
         bool tracking, pending;
-        int prevX, prevY, pendingX, pendingY, lost;
+        int prevX, prevY, pendingX, pendingY;
 
         public void Start()
         {
@@ -1092,48 +1328,47 @@ namespace MolduraFoco
 
             // A faixa de baixo da tela (painel com a barra de vida grande) e o minimapa ficam de fora.
             Rectangle searchable = new Rectangle(a.X, a.Y, a.Width, (int)(h * 0.88));
-            Rectangle minimap = new Rectangle(a.Right - (int)(h * 0.30), a.Bottom - (int)(h * 0.30), (int)(h * 0.30), (int)(h * 0.30));
+            Rectangle minimap = new Rectangle(a.Right - (int)(h * 0.40), a.Bottom - (int)(h * 0.40), (int)(h * 0.40), (int)(h * 0.40));
 
-            // Seguindo: olha só em volta de onde a barra estava. Perdeu: olha a tela toda.
-            Rectangle region = searchable;
+            // Seguindo: olha primeiro só em volta de onde a barra estava; se ela pulou para longe
+            // (Flash, por exemplo), olha a tela toda na mesma hora. Sem pista: olha a tela toda.
+            int sx, sy;
+            bool found;
             if (tracking)
             {
                 int rw = (int)(h * 0.35), rh = (int)(h * 0.22);
-                region = Rectangle.Intersect(searchable, new Rectangle(prevX - rw, prevY - rh, rw * 2, rh * 2));
+                Rectangle around = Rectangle.Intersect(searchable, new Rectangle(prevX - rw, prevY - rh, rw * 2, rh * 2));
+                found = Search(around, minimap, m, h, prevX, prevY, true, out sx, out sy)
+                        || Search(searchable, minimap, m, h, prevX, prevY, true, out sx, out sy);
+                if (!found)
+                {
+                    tracking = false;
+                    return;
+                }
             }
-            if (region.Width < 16 || region.Height < 16)
+            else
             {
-                tracking = false;
-                return;
-            }
-
-            int stride = grabber.Grab(region);
-            int ex = (tracking ? prevX : expected.X - offX) - region.X;
-            int ey = (tracking ? prevY : expected.Y - offY) - region.Y;
-            Rectangle skip = new Rectangle(minimap.X - region.X, minimap.Y - region.Y, minimap.Width, minimap.Height);
-            BarHit hit;
-            if (!BarFinder.Find(grabber.Buffer, stride, region.Width, region.Height, m, h, ex, ey, tracking, skip, out hit))
-            {
-                pending = false;
-                if (tracking && ++lost > 6) tracking = false;
-                return;
-            }
-
-            int sx = region.X + hit.X, sy = region.Y + hit.Y;
-            if (!tracking)
-            {
-                // Só começa a seguir depois de ver a barra no mesmo lugar em dois quadros seguidos.
-                bool confirmed = pending && Math.Abs(sx - pendingX) <= 12 && Math.Abs(sy - pendingY) <= 12;
-                pending = true;
-                pendingX = sx;
-                pendingY = sy;
-                if (!confirmed) return;
+                if (!Search(searchable, minimap, m, h, expected.X - offX, expected.Y - offY, false, out sx, out sy))
+                {
+                    pending = false;
+                    return;
+                }
+                // Com o carimbo da barra, um quadro basta. Sem ele, só começa a seguir depois de
+                // ver a barra no mesmo lugar em dois quadros seguidos.
+                if (!BarFinder.TemplateApplies(m, h))
+                {
+                    bool confirmed = pending && Math.Abs(sx - pendingX) <= 12 && Math.Abs(sy - pendingY) <= 12;
+                    pending = true;
+                    pendingX = sx;
+                    pendingY = sy;
+                    if (!confirmed) return;
+                }
                 pending = false;
                 tracking = true;
             }
+
             prevX = sx;
             prevY = sy;
-            lost = 0;
             lock (sync)
             {
                 resultX = sx + offX;
@@ -1141,6 +1376,22 @@ namespace MolduraFoco
                 resultTime = Environment.TickCount;
                 hasResult = true;
             }
+        }
+
+        // Captura 'region' e procura a barra nela. Devolve o canto da barra em coordenadas da tela.
+        bool Search(Rectangle region, Rectangle minimap, BarModel m, double h, int expectedX, int expectedY,
+                    bool tracking, out int sx, out int sy)
+        {
+            sx = sy = 0;
+            if (region.Width < 16 || region.Height < 16) return false;
+            int stride = grabber.Grab(region);
+            Rectangle skip = new Rectangle(minimap.X - region.X, minimap.Y - region.Y, minimap.Width, minimap.Height);
+            BarHit hit;
+            if (!BarFinder.Find(grabber.Buffer, stride, region.Width, region.Height, m, h,
+                                expectedX - region.X, expectedY - region.Y, tracking, skip, out hit)) return false;
+            sx = region.X + hit.X;
+            sy = region.Y + hit.Y;
+            return true;
         }
     }
 
@@ -1311,6 +1562,10 @@ namespace MolduraFoco
         Rectangle lastArea;
         int lastSide = int.MinValue;
         bool calibrating;
+        Thread calibrationThread;
+        volatile bool calibrationDone;
+        BarModel calibrationResult;
+        string calibrationProblem;
 
         ToolStripMenuItem statusItem, showItem, onlyInGameItem, hideWhenDeadItem, followItem, pulseItem, monitorMenu;
         readonly List<ToolStripMenuItem> shapeItems = new List<ToolStripMenuItem>();
@@ -1348,7 +1603,7 @@ namespace MolduraFoco
             saveTimer.Start();
 
             calibrationTimer.Interval = 200;
-            calibrationTimer.Tick += delegate { FinishCalibration(); };
+            calibrationTimer.Tick += delegate { OnCalibrationTick(); };
 
             live.Start();
             tracker.Start();
@@ -1560,29 +1815,38 @@ namespace MolduraFoco
         }
 
         // Aprender a barra: esconde a moldura, espera a tela atualizar e olha em volta do campeão.
+        // A captura e a gravação da imagem rodam em segundo plano, porque o gancho de teclado
+        // para de funcionar se a tela principal ficar ocupada por muito tempo.
         void StartCalibration()
         {
             if (calibrating) return;
             visible = true;
             calibrating = true;
+            calibrationThread = null;
             Refresh(true);
+            calibrationTimer.Interval = 200;
             calibrationTimer.Start();
         }
 
-        void FinishCalibration()
+        void OnCalibrationTick()
         {
-            calibrationTimer.Stop();
-            BarModel learned = null;
-            try
+            if (calibrationThread == null)
             {
-                learned = ScreenGrabber.LearnBar(lastArea, FixedCenter(lastArea));
+                Rectangle area = lastArea;
+                Point center = FixedCenter(area);
+                calibrationDone = false;
+                calibrationThread = new Thread(delegate() { RunCalibration(area, center); });
+                calibrationThread.IsBackground = true;
+                calibrationThread.Start();
+                calibrationTimer.Interval = 50;
+                return;
             }
-            catch
-            {
-                learned = null;
-            }
-            calibrating = false;
+            if (!calibrationDone) return;
 
+            calibrationTimer.Stop();
+            calibrationThread = null;
+            calibrating = false;
+            BarModel learned = calibrationResult;
             if (learned != null)
             {
                 settings.Bar = learned;
@@ -1591,10 +1855,45 @@ namespace MolduraFoco
                 overlay.ShowMessage("Barra aprendida! Seguindo", Color.White);
                 Refresh(true);
             }
+            else if (calibrationProblem == "imagem vazia")
+            {
+                Notify("Não consegui ver o jogo", "A imagem da tela veio vazia: o Windows não deixou a moldura ver o jogo. "
+                    + "Confira se o jogo está no modo \"Sem bordas\". A imagem foi salva; veja no menu: Abrir a pasta das capturas.");
+            }
             else
             {
-                Notify("Não achei a barra de vida", "Trave a câmera, confira se a moldura está em cima do campeão, "
-                    + "fique parado com a vida cheia e longe de outros campeões, e aperte Ctrl+Alt+B de novo.");
+                Notify("Não achei a barra de vida", "Fique parado com a vida cheia, longe de outros campeões, com a moldura em cima "
+                    + "do campeão, e aperte Ctrl+Alt+B de novo. A imagem que a moldura viu foi salva; veja no menu: Abrir a pasta das capturas.");
+            }
+        }
+
+        void RunCalibration(Rectangle area, Point center)
+        {
+            BarModel learned = null;
+            string problem = null;
+            try
+            {
+                learned = ScreenGrabber.LearnBar(area, center, out problem);
+            }
+            catch (Exception e)
+            {
+                problem = "erro: " + e.Message;
+            }
+            ScreenGrabber.SaveSnapshot(area, center, learned, problem);
+            calibrationResult = learned;
+            calibrationProblem = problem;
+            calibrationDone = true;
+        }
+
+        void OpenCaptureFolder()
+        {
+            try
+            {
+                Directory.CreateDirectory(Settings.Folder);
+                System.Diagnostics.Process.Start("explorer.exe", "\"" + Settings.Folder + "\"");
+            }
+            catch
+            {
             }
         }
 
@@ -1675,6 +1974,7 @@ namespace MolduraFoco
             followItem = Item("Seguir o campeão (experimental)", "Ctrl+Alt+S", delegate { ToggleFollow(); });
             menu.Items.Add(followItem);
             menu.Items.Add(Item("Aprender a barra de vida", "Ctrl+Alt+B", delegate { StartCalibration(); }));
+            menu.Items.Add(Item("Abrir a pasta das capturas", null, delegate { OpenCaptureFolder(); }));
             menu.Items.Add(new ToolStripSeparator());
 
             ToolStripMenuItem shapeMenu = new ToolStripMenuItem("Forma");
