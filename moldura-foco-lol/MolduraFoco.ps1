@@ -27,6 +27,7 @@ if (-not $administrador) {
 $codigo = @'
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -99,6 +100,26 @@ namespace MolduraFoco
         [StructLayout(LayoutKind.Sequential)]
         public struct POINT { public int X, Y; }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct SIZE { public int cx, cy; }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct BLENDFUNCTION { public byte BlendOp, BlendFlags, SourceConstantAlpha, AlphaFormat; }
+
+        public const byte AC_SRC_OVER = 0;
+        public const byte AC_SRC_ALPHA = 1;
+        public const int ULW_ALPHA = 2;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref POINT pptDst, ref SIZE psize,
+            IntPtr hdcSrc, ref POINT pptSrc, int crKey, ref BLENDFUNCTION pblend, int dwFlags);
+        [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hWnd);
+        [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+        [DllImport("gdi32.dll")] public static extern IntPtr CreateCompatibleDC(IntPtr hDC);
+        [DllImport("gdi32.dll")] public static extern bool DeleteDC(IntPtr hdc);
+        [DllImport("gdi32.dll")] public static extern IntPtr SelectObject(IntPtr hDC, IntPtr hObject);
+        [DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr hObject);
+
         [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
         [DllImport("user32.dll")] public static extern bool IsProcessDPIAware();
         [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
@@ -132,7 +153,11 @@ namespace MolduraFoco
 
     internal static class Palette
     {
-        public static readonly string[] ShapeNames = { "Cantoneiras (moldura de câmera)", "Círculo", "Quadrado", "Seta acima da cabeça" };
+        public static readonly string[] ShapeNames =
+        {
+            "Anel no chão (em volta dos pés)", "Aura em volta do corpo", "Círculo", "Seta acima da cabeça",
+            "Cantoneiras", "Quadrado"
+        };
 
         // Vermelho ficou de fora de propósito: no LoL ele indica inimigos.
         public static readonly string[] ColorNames = { "Amarelo", "Ciano", "Verde-limão", "Rosa-choque", "Laranja", "Branco", "Roxo" };
@@ -203,7 +228,7 @@ namespace MolduraFoco
                     switch (key)
                     {
                         case "OnlyInGame": s.OnlyInGame = value == "1"; break;
-                        case "Shape": s.Shape = ReadInt(value, s.Shape, 0, Palette.ShapeNames.Length - 1); break;
+                        case "Shape2": s.Shape = ReadInt(value, s.Shape, 0, Palette.ShapeNames.Length - 1); break;
                         case "Color": s.ColorIndex = ReadInt(value, s.ColorIndex, 0, Palette.Colors.Length - 1); break;
                         case "Size": s.Size = ReadDouble(value, s.Size, 0.02, 0.3); break;
                         case "HideWhenDead": s.HideWhenDead = value == "1"; break;
@@ -243,7 +268,7 @@ namespace MolduraFoco
                 CultureInfo inv = CultureInfo.InvariantCulture;
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine("OnlyInGame=" + (OnlyInGame ? "1" : "0"));
-                sb.AppendLine("Shape=" + Shape.ToString(inv));
+                sb.AppendLine("Shape2=" + Shape.ToString(inv));
                 sb.AppendLine("Color=" + ColorIndex.ToString(inv));
                 sb.AppendLine("Size=" + Size.ToString("0.0000", inv));
                 sb.AppendLine("HideWhenDead=" + (HideWhenDead ? "1" : "0"));
@@ -345,16 +370,36 @@ namespace MolduraFoco
 
     internal static class Shapes
     {
-        public const int Corners = 0;
-        public const int Circle = 1;
-        public const int Square = 2;
+        public const int GroundRing = 0;
+        public const int Aura = 1;
+        public const int Circle = 2;
         public const int Arrow = 3;
+        public const int Corners = 4;
+        public const int Square = 5;
 
+        // A câmera do LoL olha o mapa de cima, inclinada: um círculo no chão aparece achatado.
+        const float GroundSquash = 0.55f;
+
+        // (cx, cy) é o meio do corpo do campeão; r é o tamanho escolhido.
         public static GraphicsPath Build(int shape, float cx, float cy, float r)
         {
             GraphicsPath p = new GraphicsPath();
             switch (shape)
             {
+                case GroundRing:
+                {
+                    float rx = r * 0.9f, ry = rx * GroundSquash, feetY = cy + r * 0.62f;
+                    p.AddEllipse(cx - rx, feetY - ry, 2 * rx, 2 * ry);
+                    break;
+                }
+
+                case Aura:
+                {
+                    float rx = r * 0.78f, ry = r * 1.12f;
+                    p.AddEllipse(cx - rx, cy - ry, 2 * rx, 2 * ry);
+                    break;
+                }
+
                 case Circle:
                     p.AddEllipse(cx - r, cy - r, 2 * r, 2 * r);
                     break;
@@ -403,36 +448,83 @@ namespace MolduraFoco
             p.AddLines(new PointF[] { new PointF(ax, ay), new PointF(bx, by), new PointF(cx, cy) });
         }
 
-        public static void Draw(Graphics g, int shape, float cx, float cy, float r, float thickness, Color color)
+        // Desenha com brilho suave em volta, um contorno escuro fino (para aparecer em chão
+        // claro e escuro) e o traço colorido por cima. 'glow' = false para ícones pequenos.
+        public static void Draw(Graphics g, int shape, float cx, float cy, float r, float thickness, Color color, bool glow)
         {
             using (GraphicsPath path = Build(shape, cx, cy, r))
-            using (Pen outline = new Pen(Color.Black, thickness + 4f))
-            using (Pen pen = new Pen(color, thickness))
             {
-                // O contorno preto mantém a moldura visível tanto na grama quanto no rio.
-                outline.LineJoin = LineJoin.Round;
-                outline.StartCap = outline.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-                pen.StartCap = pen.EndCap = LineCap.Round;
+                // No anel do chão, a metade de trás passa por cima do corpo do campeão:
+                // ela vai desbotando para cima, como se ficasse atrás dele.
+                RectangleF fade = RectangleF.Empty;
+                if (glow && shape == GroundRing)
+                {
+                    fade = path.GetBounds();
+                    fade.Inflate(thickness * 4f, thickness * 4f);
+                }
 
-                g.DrawPath(outline, path);
+                if (glow)
+                {
+                    DrawStroke(g, path, Color.FromArgb(28, color), thickness * 6f, fade);
+                    DrawStroke(g, path, Color.FromArgb(55, color), thickness * 3.5f, fade);
+                    if (shape == GroundRing)
+                    {
+                        // Luz suave no chão, dentro do anel.
+                        using (Brush floor = new SolidBrush(Color.FromArgb(38, color))) g.FillPath(floor, path);
+                    }
+                }
+                DrawStroke(g, path, Color.FromArgb(glow ? 150 : 255, 0, 0, 0), thickness + 2.5f, fade);
                 if (shape == Arrow)
                 {
                     using (Brush fill = new SolidBrush(color)) g.FillPath(fill, path);
                 }
                 else
                 {
-                    g.DrawPath(pen, path);
+                    DrawStroke(g, path, color, thickness, fade);
+                    if (glow && thickness >= 3f)
+                    {
+                        // Fio mais claro no meio do traço, para dar brilho.
+                        Color light = Color.FromArgb(170, (color.R + 255) / 2, (color.G + 255) / 2, (color.B + 255) / 2);
+                        DrawStroke(g, path, light, Math.Max(1f, thickness * 0.3f), fade);
+                    }
                 }
+            }
+        }
+
+        // 'fade' vazio: traço de uma cor só. Senão, o traço desbota de baixo (cor cheia) para cima.
+        static void DrawStroke(Graphics g, GraphicsPath path, Color color, float width, RectangleF fade)
+        {
+            Brush brush;
+            if (fade.IsEmpty)
+            {
+                brush = new SolidBrush(color);
+            }
+            else
+            {
+                LinearGradientBrush gradient = new LinearGradientBrush(fade,
+                    Color.FromArgb(color.A * 25 / 100, color), color, LinearGradientMode.Vertical);
+                Blend blend = new Blend();
+                blend.Positions = new float[] { 0f, 0.55f, 1f };
+                blend.Factors = new float[] { 0f, 1f, 1f };
+                gradient.Blend = blend;
+                gradient.WrapMode = WrapMode.TileFlipXY;
+                brush = gradient;
+            }
+            using (brush)
+            using (Pen pen = new Pen(brush, width))
+            {
+                pen.LineJoin = LineJoin.Round;
+                pen.StartCap = pen.EndCap = LineCap.Round;
+                g.DrawPath(pen, path);
             }
         }
     }
 
-    // Janela transparente, sempre por cima, que não recebe cliques nem foco.
+    // Janela sempre por cima, que não recebe cliques nem foco. Ela entrega ao Windows uma
+    // imagem com transparência em cada pixel (UpdateLayeredWindow), o que permite brilho
+    // suave e preenchimento leve, em vez de pixels só "cheios ou vazios".
     internal sealed class OverlayForm : Form
     {
-        static readonly Color KeyColor = Color.FromArgb(1, 2, 3);
-
         readonly Settings settings;
         float radius = 70f;
         float thickness = 4f;
@@ -442,6 +534,11 @@ namespace MolduraFoco
         int messageUntil;
         bool messageShown;
 
+        Rectangle placed;
+        bool imageDirty = true;
+        byte alpha = 255;
+        IntPtr memDc = IntPtr.Zero, hBitmap = IntPtr.Zero, oldBitmap = IntPtr.Zero;
+
         public OverlayForm(Settings settings)
         {
             this.settings = settings;
@@ -450,9 +547,6 @@ namespace MolduraFoco
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.Manual;
             TopMost = true;
-            BackColor = KeyColor;
-            TransparencyKey = KeyColor;
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
         }
 
         protected override bool ShowWithoutActivation
@@ -471,6 +565,13 @@ namespace MolduraFoco
             }
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            imageDirty = true;
+            Commit();
+        }
+
         // Aviso curto escrito embaixo da moldura (as notificações do Windows
         // costumam ficar escondidas enquanto se joga).
         public void ShowMessage(string text, Color color)
@@ -485,50 +586,121 @@ namespace MolduraFoco
             get { return message != null && unchecked(Environment.TickCount - messageUntil) < 0; }
         }
 
-        // Centraliza a moldura em (cx, cy). Só redesenha quando algo mudou.
+        // Transparência geral (0 a 255), usada pela opacidade e pelo efeito de pulsar.
+        public byte Alpha
+        {
+            get { return alpha; }
+            set
+            {
+                if (value == alpha) return;
+                alpha = value;
+                Commit();
+            }
+        }
+
+        // Centraliza a moldura em (cx, cy), o meio do corpo do campeão. Só redesenha quando algo mudou.
         public void Place(Rectangle area, int cx, int cy, bool repaint)
         {
             float h = area.Height;
             float newRadius = Math.Max(10f, (float)(settings.Size * h));
             float newThickness = Math.Max(2f, (float)Math.Round(Palette.ThicknessAt1080p[settings.Thickness] * h / 1080f));
             bool withMessage = HasMessage;
-            if (newRadius != radius || newThickness != thickness || withMessage != messageShown) repaint = true;
+            if (repaint || newRadius != radius || newThickness != thickness || withMessage != messageShown) imageDirty = true;
             radius = newRadius;
             thickness = newThickness;
             messageShown = withMessage;
             fontSize = Math.Max(13f, h * 0.016f);
 
-            int half = (int)Math.Ceiling(radius * 1.9f + thickness * 2 + 6);
+            int half = (int)Math.Ceiling(radius * 1.9f + thickness * 4 + 8);
             if (withMessage) half = Math.Max(half, (int)Math.Ceiling(Math.Max(radius * 1.3f + fontSize * 2.2f, fontSize * 9f)));
             Rectangle bounds = new Rectangle(cx - half, cy - half, half * 2, half * 2);
-            if (Bounds.Size != bounds.Size) repaint = true;
-            if (Bounds != bounds) Bounds = bounds;
-            if (repaint) Invalidate();
+            if (bounds.Size != placed.Size) imageDirty = true;
+            if (imageDirty || bounds != placed)
+            {
+                placed = bounds;
+                Commit();
+            }
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        // Entrega ao Windows a posição, a transparência e (se mudou) o desenho.
+        void Commit()
         {
-            Graphics g = e.Graphics;
-            g.Clear(KeyColor);
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float cx = ClientSize.Width / 2f, cy = ClientSize.Height / 2f;
-            Shapes.Draw(g, settings.Shape, cx, cy, radius, thickness, Palette.Colors[settings.ColorIndex]);
-
-            if (messageShown && message != null)
+            if (!IsHandleCreated || placed.Width <= 0 || placed.Height <= 0) return;
+            if (imageDirty || memDc == IntPtr.Zero)
             {
-                using (GraphicsPath text = new GraphicsPath())
-                using (StringFormat format = new StringFormat())
-                using (Pen outline = new Pen(Color.Black, Math.Max(3f, fontSize / 4f)))
-                using (Brush fill = new SolidBrush(messageColor))
-                {
-                    format.Alignment = StringAlignment.Center;
-                    text.AddString(message, FontFamily.GenericSansSerif, (int)FontStyle.Bold, fontSize,
-                        new PointF(cx, cy + radius * 1.3f), format);
-                    outline.LineJoin = LineJoin.Round;
-                    g.DrawPath(outline, text);
-                    g.FillPath(fill, text);
-                }
+                Render();
+                imageDirty = false;
             }
+            Native.POINT position = new Native.POINT();
+            position.X = placed.X;
+            position.Y = placed.Y;
+            Native.SIZE size = new Native.SIZE();
+            size.cx = placed.Width;
+            size.cy = placed.Height;
+            Native.POINT origin = new Native.POINT();
+            Native.BLENDFUNCTION blend = new Native.BLENDFUNCTION();
+            blend.BlendOp = Native.AC_SRC_OVER;
+            blend.SourceConstantAlpha = alpha;
+            blend.AlphaFormat = Native.AC_SRC_ALPHA;
+            Native.UpdateLayeredWindow(Handle, IntPtr.Zero, ref position, ref size, memDc, ref origin, 0, ref blend, Native.ULW_ALPHA);
+        }
+
+        void Render()
+        {
+            using (Bitmap bmp = new Bitmap(placed.Width, placed.Height, PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.Clear(Color.Transparent);
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    float cx = placed.Width / 2f, cy = placed.Height / 2f;
+                    Shapes.Draw(g, settings.Shape, cx, cy, radius, thickness, Palette.Colors[settings.ColorIndex], true);
+                    if (messageShown && message != null) DrawMessage(g, cx, cy);
+                }
+                ReleaseImage();
+                IntPtr screenDc = Native.GetDC(IntPtr.Zero);
+                memDc = Native.CreateCompatibleDC(screenDc);
+                Native.ReleaseDC(IntPtr.Zero, screenDc);
+                hBitmap = bmp.GetHbitmap(Color.FromArgb(0));
+                oldBitmap = Native.SelectObject(memDc, hBitmap);
+            }
+        }
+
+        void DrawMessage(Graphics g, float cx, float cy)
+        {
+            using (GraphicsPath text = new GraphicsPath())
+            using (StringFormat format = new StringFormat())
+            using (Pen outline = new Pen(Color.Black, Math.Max(3f, fontSize / 4f)))
+            using (Brush fill = new SolidBrush(messageColor))
+            {
+                format.Alignment = StringAlignment.Center;
+                text.AddString(message, FontFamily.GenericSansSerif, (int)FontStyle.Bold, fontSize,
+                    new PointF(cx, cy + radius * 1.3f), format);
+                outline.LineJoin = LineJoin.Round;
+                g.DrawPath(outline, text);
+                g.FillPath(fill, text);
+            }
+        }
+
+        void ReleaseImage()
+        {
+            if (memDc != IntPtr.Zero)
+            {
+                Native.SelectObject(memDc, oldBitmap);
+                Native.DeleteDC(memDc);
+                memDc = IntPtr.Zero;
+            }
+            if (hBitmap != IntPtr.Zero)
+            {
+                Native.DeleteObject(hBitmap);
+                hBitmap = IntPtr.Zero;
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            ReleaseImage();
+            base.Dispose(disposing);
         }
     }
 
@@ -1235,12 +1407,25 @@ namespace MolduraFoco
         Point expectedCenter;
         BarModel model;
         bool hasResult;
-        int resultX, resultY, resultTime;
+        int resultX, resultY;
+        double resultVX, resultVY;   // velocidade do campeão na tela, em pixels por segundo
+        long resultStamp;
+
+        // Chamado (na thread de busca) sempre que a barra é encontrada, para a tela principal
+        // mover a moldura na hora, sem esperar o próximo ciclo.
+        public Action Updated;
+
+        // Prevê um pouquinho do movimento para compensar o atraso entre a captura e a tela.
+        public static bool Prediction = true;
+        const double PredictionLead = 0.020;  // segundos
+        const double MaxLead = 0.050;
 
         // Usado só pela thread de busca.
         readonly ScreenGrabber grabber = new ScreenGrabber();
         bool tracking, pending;
         int prevX, prevY, pendingX, pendingY;
+        long prevStamp;
+        double velX, velY;
 
         public void Start()
         {
@@ -1268,13 +1453,22 @@ namespace MolduraFoco
             }
         }
 
-        // Centro do campeão encontrado há pouco tempo, em coordenadas da tela.
+        // Centro do campeão encontrado há pouco tempo, em coordenadas da tela, já adiantado
+        // pelo movimento dele.
         public bool TryGetCenter(out Point center)
         {
             lock (sync)
             {
                 center = new Point(resultX, resultY);
-                return hasResult && unchecked(Environment.TickCount - resultTime) < 600;
+                if (!hasResult) return false;
+                double age = (Stopwatch.GetTimestamp() - resultStamp) / (double)Stopwatch.Frequency;
+                if (age > 0.6) return false;
+                if (Prediction)
+                {
+                    double lead = Math.Min(age + PredictionLead, MaxLead);
+                    center = new Point((int)Math.Round(resultX + resultVX * lead), (int)Math.Round(resultY + resultVY * lead));
+                }
+                return true;
             }
         }
 
@@ -1313,7 +1507,7 @@ namespace MolduraFoco
                     pending = false;
                     Thread.Sleep(400);
                 }
-                int period = tracking ? 33 : 100;
+                int period = tracking ? 16 : 100;
                 int spent = unchecked(Environment.TickCount - began);
                 if (spent < period) Thread.Sleep(period - spent);
             }
@@ -1334,9 +1528,10 @@ namespace MolduraFoco
             // (Flash, por exemplo), olha a tela toda na mesma hora. Sem pista: olha a tela toda.
             int sx, sy;
             bool found;
+            bool wasTracking = tracking;
             if (tracking)
             {
-                int rw = (int)(h * 0.35), rh = (int)(h * 0.22);
+                int rw = (int)(h * 0.25), rh = (int)(h * 0.15);
                 Rectangle around = Rectangle.Intersect(searchable, new Rectangle(prevX - rw, prevY - rh, rw * 2, rh * 2));
                 found = Search(around, minimap, m, h, prevX, prevY, true, out sx, out sy)
                         || Search(searchable, minimap, m, h, prevX, prevY, true, out sx, out sy);
@@ -1367,15 +1562,41 @@ namespace MolduraFoco
                 tracking = true;
             }
 
+            // Velocidade: média entre a medida nova e a anterior, para não tremer. Pulos grandes
+            // (Flash, por exemplo) e a primeira medida depois de achar a barra zeram a velocidade.
+            long now = Stopwatch.GetTimestamp();
+            double dt = (now - prevStamp) / (double)Stopwatch.Frequency;
+            double jump = Math.Max(Math.Abs(sx - prevX), Math.Abs(sy - prevY));
+            if (wasTracking && dt > 0.004 && dt < 0.25 && jump < h * 0.08)
+            {
+                velX = velX * 0.4 + (sx - prevX) / dt * 0.6;
+                velY = velY * 0.4 + (sy - prevY) / dt * 0.6;
+                double speed = Math.Sqrt(velX * velX + velY * velY), maxSpeed = h * 1.5;
+                if (speed > maxSpeed)
+                {
+                    velX *= maxSpeed / speed;
+                    velY *= maxSpeed / speed;
+                }
+            }
+            else
+            {
+                velX = velY = 0;
+            }
             prevX = sx;
             prevY = sy;
+            prevStamp = now;
+
             lock (sync)
             {
                 resultX = sx + offX;
                 resultY = sy + offY;
-                resultTime = Environment.TickCount;
+                resultVX = velX;
+                resultVY = velY;
+                resultStamp = now;
                 hasResult = true;
             }
+            Action updated = Updated;
+            if (updated != null) updated();
         }
 
         // Captura 'region' e procura a barra nela. Devolve o canto da barra em coordenadas da tela.
@@ -1547,6 +1768,8 @@ namespace MolduraFoco
         readonly HotkeyWindow hotkeys;
         readonly LiveGame live = new LiveGame();
         readonly Tracker tracker = new Tracker();
+        SynchronizationContext uiContext;
+        int followQueued;
         readonly WinTimer trackTimer = new WinTimer();
         readonly WinTimer calibrationTimer = new WinTimer();
         readonly WinTimer pulseTimer = new WinTimer();
@@ -1606,6 +1829,8 @@ namespace MolduraFoco
             calibrationTimer.Tick += delegate { OnCalibrationTick(); };
 
             live.Start();
+            uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
+            tracker.Updated = OnTrackerUpdated;
             tracker.Start();
             Refresh(true);
 
@@ -1680,6 +1905,18 @@ namespace MolduraFoco
             if (!settings.Pulse) SetOpacityIfChanged(BaseOpacity);
         }
 
+        // Chamado na thread de busca quando a barra é encontrada: pede à tela principal para
+        // mover a moldura na hora (no máximo um pedido pendente por vez).
+        void OnTrackerUpdated()
+        {
+            if (Interlocked.Exchange(ref followQueued, 1) != 0) return;
+            uiContext.Post(delegate
+            {
+                Interlocked.Exchange(ref followQueued, 0);
+                Refresh(false);
+            }, null);
+        }
+
         bool IsFollowing
         {
             get { return settings.Follow && settings.Bar != null && settings.Bar.Valid; }
@@ -1709,7 +1946,7 @@ namespace MolduraFoco
 
         void SetOpacityIfChanged(double value)
         {
-            if (Math.Abs(overlay.Opacity - value) > 0.001) overlay.Opacity = value;
+            overlay.Alpha = (byte)Math.Max(0, Math.Min(255, Math.Round(value * 255)));
         }
 
         static IntPtr FindGameWindow()
@@ -2134,7 +2371,10 @@ namespace MolduraFoco
                 {
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     g.Clear(Color.Transparent);
-                    Shapes.Draw(g, Shapes.Corners, 16, 16, 12, 3, Palette.Colors[0]);
+                    // Anel no chão com um pontinho no meio, no amarelo padrão.
+                    using (Brush floor = new SolidBrush(Color.FromArgb(70, Palette.Colors[0]))) g.FillEllipse(floor, 3, 9, 26, 15);
+                    using (Pen dark = new Pen(Color.Black, 5f)) g.DrawEllipse(dark, 3, 9, 26, 15);
+                    using (Pen ring = new Pen(Palette.Colors[0], 3f)) g.DrawEllipse(ring, 3, 9, 26, 15);
                     using (Brush dot = new SolidBrush(Palette.Colors[0])) g.FillEllipse(dot, 12, 12, 8, 8);
                 }
                 trayIconHandle = bmp.GetHicon();
@@ -2149,12 +2389,19 @@ namespace MolduraFoco
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(Color.Transparent);
-                // A seta é desenhada acima do centro, então o centro fica abaixo da imagem.
-                float r = shape == Shapes.Arrow ? 20f : 5.5f;
-                float cy = shape == Shapes.Arrow ? 38.5f : 8f;
-                using (GraphicsPath path = Shapes.Build(shape, 8, cy, r))
+                using (GraphicsPath path = Shapes.Build(shape, 0, 0, 10))
                 using (Pen pen = new Pen(Color.FromArgb(60, 60, 60), 1.6f))
                 {
+                    // Encaixa a forma, seja qual for, num quadradinho de 13 pixels no meio do ícone.
+                    RectangleF box = path.GetBounds();
+                    float scale = 13f / Math.Max(box.Width, box.Height);
+                    using (Matrix fit = new Matrix())
+                    {
+                        fit.Translate(8f, 8f);
+                        fit.Scale(scale, scale);
+                        fit.Translate(-(box.Left + box.Width / 2f), -(box.Top + box.Height / 2f));
+                        path.Transform(fit);
+                    }
                     if (shape == Shapes.Arrow)
                         using (Brush b = new SolidBrush(Color.FromArgb(60, 60, 60))) g.FillPath(b, path);
                     else

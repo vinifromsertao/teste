@@ -32,7 +32,7 @@ Como usar
    (O LoL roda como administrador, e sem essa permissão o Windows bloqueia
    os atalhos de teclado enquanto o jogo está na frente. A moldura não
    altera nada no computador.)
-   Aparece um aviso no canto da tela e um ícone de cantoneiras amarelas
+   Aparece um aviso no canto da tela e um ícone de anel amarelo
    perto do relógio do Windows (se não achar, clique na setinha ^ ao lado
    do relógio).
 2. Abra o jogo normalmente.
@@ -60,21 +60,29 @@ desligado no menu ("Esconder quando o campeão morrer").
 
 Seguir o campeão (experimental)
 -------------------------------
-Neste modo a moldura procura na tela, umas 30 vezes por segundo, a barra
+Neste modo a moldura procura na tela, umas 60 vezes por segundo, a barra
 de vida do SEU campeão (a verde) e vai atrás dele, mesmo com a câmera
-solta. Quando o campeão sai da tela, a moldura some; quando ele aparece
-de novo, ela volta.
+solta. Ela se move assim que acha a barra e se adianta um pouquinho na
+direção em que o campeão está andando, para não ficar para trás. Quando
+o campeão sai da tela, a moldura some; quando ele aparece de novo, ela
+volta.
 
 Para ligar (só na primeira vez):
-1. Numa partida (pode ser no modo Prática), coloque a moldura em cima do
-   campeão ou da barra de vida dele (Ctrl + Alt + setas). A moldura vai
-   seguir o campeão mantendo essa mesma posição.
+1. Numa partida (pode ser no modo Prática), use Ctrl + Alt + setas para
+   encaixar o anel nos pés do campeão (com as outras formas, deixe a
+   moldura no meio do corpo dele). A moldura vai seguir o campeão
+   mantendo essa mesma posição.
 2. Fique parado, de preferência com a vida cheia e longe de outros campeões.
 3. Aperte Ctrl + Alt + B. Embaixo da moldura deve aparecer
    "Barra aprendida! Seguindo".
 Pronto: a partir daí, Ctrl + Alt + S liga e desliga o modo seguir.
 Com ele ligado, Ctrl + Alt + setas ajustam onde a moldura fica em relação
 ao campeão.
+
+Já ensinou a barra numa versão anterior? Como agora a forma padrão é um
+anel nos pés, ele pode aparecer mais para cima do que deveria. Com o modo
+seguir ligado, desça-o com Ctrl + Alt + seta para baixo, ou refaça o
+Ctrl + Alt + B com o anel encaixado nos pés.
 
 Se aparecer "Não achei a barra de vida", confira os passos acima e tente
 de novo. Se você mudar a resolução do jogo ou a aparência das barras de
@@ -115,7 +123,12 @@ Ctrl + Alt + R ............ voltar à posição e ao tamanho iniciais
 Ctrl + Alt + B ............ aprender a barra de vida (para seguir o campeão)
 Ctrl + Alt + S ............ ligar / desligar o modo seguir o campeão
 
-Formas: cantoneiras (padrão), círculo, quadrado e seta acima da cabeça.
+Formas (Ctrl + Alt + M ou menu do ícone):
+- Anel no chão (padrão): um anel com brilho suave em volta dos pés do
+  campeão, como o círculo de seleção do jogo. A parte de trás do anel fica
+  mais fraca, para não esconder o campeão.
+- Aura em volta do corpo: um oval em pé, contornando o campeão inteiro.
+- Círculo, seta acima da cabeça, cantoneiras e quadrado.
 Cores: amarelo, ciano, verde-limão, rosa-choque, laranja, branco e roxo.
 (O vermelho ficou de fora porque no LoL ele indica os inimigos.)
 
