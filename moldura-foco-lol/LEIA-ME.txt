@@ -20,9 +20,9 @@ Antes de começar (só na primeira vez)
 2. No League of Legends, abra as Configurações (tecla Esc durante a partida):
    - Vídeo > Modo de janela: escolha "Sem bordas".
      No modo "Tela cheia" o Windows não deixa nada aparecer por cima do jogo.
-   - A moldura marca o lugar onde o campeão fica com a câmera TRAVADA.
-     Com a câmera solta ela continua nesse lugar e não acompanha o
-     campeão (veja "Perguntas comuns").
+   - Normalmente a moldura marca o lugar onde o campeão fica com a câmera
+     TRAVADA. Para ela acompanhar o campeão também com a câmera solta,
+     veja a seção "Seguir o campeão (experimental)".
 
 
 Como usar
@@ -54,6 +54,42 @@ Enquanto o campeão está morto, a moldura some sozinha. Isso pode ser
 desligado no menu ("Esconder quando o campeão morrer").
 
 
+Seguir o campeão (experimental)
+-------------------------------
+Neste modo a moldura procura na tela, umas 30 vezes por segundo, a barra
+de vida do SEU campeão (a verde) e vai atrás dele, mesmo com a câmera
+solta. Quando o campeão sai da tela, a moldura some; quando ele aparece
+de novo, ela volta.
+
+Para ligar (só na primeira vez):
+1. Numa partida (pode ser no modo Prática), trave a câmera e confira se a
+   moldura está em cima do campeão.
+2. Fique parado, com a vida cheia e longe de outros campeões.
+3. Aperte Ctrl + Alt + B. Embaixo da moldura deve aparecer
+   "Barra aprendida! Seguindo".
+Pronto: a partir daí, Ctrl + Alt + S liga e desliga o modo seguir.
+Com ele ligado, Ctrl + Alt + setas ajustam onde a moldura fica em relação
+ao campeão.
+
+Se aparecer "Não achei a barra de vida", confira os passos acima e tente
+de novo. Se você mudar a aparência das barras de vida (por exemplo, o modo
+para daltônicos), repita o Ctrl + Alt + B.
+
+Limites deste modo:
+- Ele foi testado só com imagens simuladas parecidas com o jogo. No jogo
+  de verdade pode precisar de ajustes; se não funcionar bem, avise.
+- Usa um pouco mais do computador, porque olha a tela o tempo todo.
+- A moldura chega ao campeão com um atraso pequeno (fração de segundo).
+- Perto da parte de baixo da tela (atrás do painel do jogo) e em cima do
+  minimapa a moldura não procura, para não confundir com a barra de vida
+  grande do painel.
+- Risco: este modo analisa a imagem da tela, algo parecido com o que
+  alguns programas de trapaça fazem, embora ele não aperte nenhuma tecla
+  e não mostre nada escondido. As regras da Riot não falam disso de forma
+  clara, então o risco é maior do que o da moldura fixa. Se preferir não
+  arriscar, deixe este modo desligado.
+
+
 Atalhos (funcionam com o jogo aberto)
 -------------------------------------
 Ctrl + Alt + F ............ mostrar / esconder a moldura
@@ -64,6 +100,8 @@ Ctrl + Alt + C ............ trocar a cor
 Ctrl + Alt + P ............ ligar / desligar o efeito de pulsar
 Ctrl + Alt + R ............ voltar à posição e ao tamanho iniciais
                             (só do lado da partida atual)
+Ctrl + Alt + B ............ aprender a barra de vida (para seguir o campeão)
+Ctrl + Alt + S ............ ligar / desligar o modo seguir o campeão
 
 Formas: cantoneiras (padrão), círculo, quadrado e seta acima da cabeça.
 Cores: amarelo, ciano, verde-limão, rosa-choque, laranja, branco e roxo.
@@ -98,10 +136,9 @@ Perguntas comuns
 
 * A moldura não fica em cima do campeão.
   Com a câmera travada, ajuste com Ctrl + Alt + setas (cada lado do mapa
-  tem o seu ajuste). Com a câmera solta o campeão anda pela tela e a moldura
-  não tem como acompanhar: o jogo não informa a posição do campeão aos
-  programas, e a moldura também não sabe se a câmera está travada. Se ela
-  atrapalhar nesses momentos, esconda com Ctrl + Alt + F.
+  tem o seu ajuste). Com a câmera solta, só o modo "Seguir o campeão"
+  acompanha o campeão; sem ele, esconda a moldura com Ctrl + Alt + F
+  quando ela atrapalhar.
 
 * Apareceu um aviso do Windows ou do antivírus.
   O programa é um arquivo de texto (MolduraFoco.ps1) que pode ser aberto no
@@ -110,11 +147,12 @@ Perguntas comuns
 
 * Isso pode dar banimento?
   O programa não lê a memória do jogo, não automatiza nenhuma ação e não
-  mostra informação escondida. Ele só desenha uma figura na tela, pergunta
+  mostra informação escondida. Ele desenha uma figura na tela, pergunta
   ao Windows onde está a janela do jogo (como fazem programas de gravação,
   por exemplo o OBS) e consulta a API oficial que o próprio LoL oferece
-  durante a partida. Mesmo assim, quem decide o que é permitido é a Riot,
-  e as regras podem mudar. Use por sua conta.
+  durante a partida. O modo "Seguir o campeão" também analisa a imagem da
+  tela, e por isso tem um risco maior (veja a seção dele). Quem decide o
+  que é permitido é a Riot, e as regras podem mudar. Use por sua conta.
 
 * Quero voltar tudo ao padrão.
   Apague o arquivo %APPDATA%\MolduraFocoLoL\config.txt (cole esse endereço
