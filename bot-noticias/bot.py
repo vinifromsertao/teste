@@ -65,7 +65,8 @@ def pontuacao(texto):
 
 def limpar_titulo(titulo, fonte):
     # O Google News acrescenta " - Nome do site" ao final do título.
-    return re.sub(rf"\s+-\s+{re.escape(fonte)}.*$", "", titulo, flags=re.I).strip()
+    nome = r"\s*".join(map(re.escape, fonte.split()))
+    return re.sub(rf"\s+-\s+{nome}.*$", "", titulo, flags=re.I).strip()
 
 
 def buscar_noticias():
@@ -114,7 +115,7 @@ def enviar(mensagem):
     from twilio.rest import Client
 
     client = Client(os.environ["TWILIO_ACCOUNT_SID"], os.environ["TWILIO_AUTH_TOKEN"])
-    remetente = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+    remetente = os.environ.get("TWILIO_WHATSAPP_FROM") or "whatsapp:+14155238886"
     destinatarios = [n.strip() for n in os.environ["DESTINATARIOS"].split(",") if n.strip()]
 
     for numero in destinatarios:
