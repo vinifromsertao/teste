@@ -115,10 +115,13 @@ def enviar(mensagem):
     from twilio.rest import Client
 
     client = Client(os.environ["TWILIO_ACCOUNT_SID"], os.environ["TWILIO_AUTH_TOKEN"])
-    remetente = os.environ.get("TWILIO_WHATSAPP_FROM") or "whatsapp:+14155238886"
+    remetente = (os.environ.get("TWILIO_WHATSAPP_FROM") or "whatsapp:+14155238886").replace(" ", "")
+    if not remetente.startswith("whatsapp:"):
+        remetente = f"whatsapp:{remetente}"
     destinatarios = [n.strip() for n in os.environ["DESTINATARIOS"].split(",") if n.strip()]
 
     for numero in destinatarios:
+        numero = numero.replace(" ", "").replace("-", "")
         if not numero.startswith("whatsapp:"):
             numero = f"whatsapp:{numero}"
         msg = client.messages.create(from_=remetente, to=numero, body=mensagem[:1600])
