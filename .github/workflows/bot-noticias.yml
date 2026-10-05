@@ -1,0 +1,32 @@
+name: Bot de notícias (WhatsApp)
+
+on:
+  schedule:
+    # 9h45 UTC = 6h45 em Brasília. O GitHub costuma atrasar alguns minutos
+    # os agendamentos, então a mensagem chega por volta das 7h.
+    - cron: "45 9 * * *"
+  workflow_dispatch: # permite rodar manualmente pela aba Actions
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bot-noticias
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Buscar e enviar notícias
+        run: python bot.py
+        env:
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          DESTINATARIOS: ${{ secrets.DESTINATARIOS }}
