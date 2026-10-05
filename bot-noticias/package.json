@@ -1,0 +1,13 @@
+{
+  "name": "bot-noticias-whatsapp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "enviar": "node whatsapp.js"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

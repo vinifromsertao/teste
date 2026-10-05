@@ -6,27 +6,85 @@ on:
     # os agendamentos, então a mensagem chega por volta das 7h.
     - cron: "45 9 * * *"
   workflow_dispatch: # permite rodar manualmente pela aba Actions
+    inputs:
+      parear:
+        description: "Conectar o WhatsApp (só na primeira vez ou se desconectar)"
+        type: boolean
+        default: false
+      numero:
+        description: "Seu número com DDI e DDD, só para parear (ex.: 5516999999999)"
+        required: false
+
+concurrency:
+  group: bot-noticias
 
 jobs:
   enviar:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: bot-noticias
+    env:
+      SESSAO_SENHA: ${{ secrets.SESSAO_SENHA }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Conferir segredos
+        run: |
+          if [ -z "$SESSAO_SENHA" ]; then
+            echo "::error::Crie o segredo SESSAO_SENHA (veja bot-noticias/README.md)."
+            exit 1
+          fi
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: bot-noticias/package-lock.json
 
-      - name: Buscar e enviar notícias
+      - run: pip install -r requirements.txt && npm ci
+
+      # A sessão do WhatsApp fica no cache do GitHub, criptografada com SESSAO_SENHA.
+      - name: Restaurar sessão do WhatsApp
+        uses: actions/cache/restore@v4
+        with:
+          path: bot-noticias/sessao.tar.gz.enc
+          key: wa-sessao-${{ github.run_id }}
+          restore-keys: wa-sessao-
+
+      - name: Descriptografar sessão
+        run: |
+          if [ -f sessao.tar.gz.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -pass env:SESSAO_SENHA -in sessao.tar.gz.enc | tar xz
+          fi
+
+      - name: Buscar notícias
+        if: ${{ !inputs.parear }}
         run: python bot.py
+
+      - name: Conectar ao WhatsApp / enviar
+        run: node whatsapp.js
         env:
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          PAREAR: ${{ inputs.parear && '1' || '0' }}
+          WHATSAPP_NUMERO: ${{ inputs.numero }}
           DESTINATARIOS: ${{ secrets.DESTINATARIOS }}
+
+      - name: Criptografar sessão
+        if: always()
+        run: |
+          if [ -d sessao ]; then
+            tar cz sessao | openssl enc -aes-256-cbc -pbkdf2 -pass env:SESSAO_SENHA -out sessao.tar.gz.enc
+          fi
+
+      - name: Salvar sessão do WhatsApp
+        if: always() && hashFiles('bot-noticias/sessao.tar.gz.enc') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: bot-noticias/sessao.tar.gz.enc
+          key: wa-sessao-${{ github.run_id }}
