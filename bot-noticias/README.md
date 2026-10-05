@@ -2,30 +2,36 @@
 
 Todo dia, por volta das 7h (horário de Brasília), o bot busca notícias sobre a
 eleição na **Carta Capital** e na **Mídia Ninja**. Ele dá prioridade às que
-citam Flávio Bolsonaro e Lula e envia de 2 a 4 delas pelo WhatsApp, usando a
-Twilio.
+citam Flávio Bolsonaro e Lula e envia de 2 a 4 delas **do seu próprio
+WhatsApp**, conectado como "aparelho vinculado" (igual ao WhatsApp Web).
 
-## Passo a passo
+> ⚠️ Esse tipo de conexão não é oficial e viola os termos de uso do WhatsApp.
+> O número pode ser bloqueado, principalmente se enviar para muitas pessoas.
+> Envie só para quem pediu para receber: durante o período eleitoral, a
+> Resolução TSE nº 23.610/2019 proíbe o disparo em massa sem consentimento.
 
-1. **Crie uma conta na Twilio** em <https://www.twilio.com/try-twilio>.
-2. No painel, abra *Messaging → Try it out → Send a WhatsApp message*. Do seu
-   celular, mande para o número indicado a mensagem `join <código>` que aparece
-   na tela. **Cada pessoa que for receber precisa fazer isso** enquanto você
-   usa o modo de teste (sandbox).
-3. No GitHub, abra o repositório e vá em **Settings → Secrets and variables →
-   Actions → New repository secret**. Crie estes quatro segredos:
+## Configuração (uma vez só)
+
+1. **Segredos do repositório** (*Settings → Secrets and variables → Actions*):
 
    | Nome | Valor |
    |---|---|
-   | `TWILIO_ACCOUNT_SID` | o "Account SID" do painel da Twilio |
-   | `TWILIO_AUTH_TOKEN` | o "Auth Token" do painel da Twilio |
-   | `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` (número do sandbox) |
-   | `DESTINATARIOS` | números com DDI e DDD, separados por vírgula: `+5511999999999,+5521988888888` |
+   | `SESSAO_SENHA` | uma senha longa qualquer, inventada por você (protege a conexão do WhatsApp) |
+   | `DESTINATARIOS` | números que recebem, com DDI e DDD, separados por vírgula: `+5516999999999` |
 
-4. Junte (merge) este código na branch `main`. O GitHub só executa os
-   agendamentos que estão na branch principal.
-5. Para testar na hora, vá em **Actions → Bot de notícias (WhatsApp) → Run
-   workflow**.
+2. **Conectar o WhatsApp:** vá em *Actions → Bot de notícias (WhatsApp) →
+   Run workflow*, marque **parear**, preencha **numero** com o seu número
+   (ex.: `5516999999999`) e clique em **Run workflow**.
+3. Abra a execução que começou e clique em **enviar → Conectar ao WhatsApp /
+   enviar**. Aparece um **código de 8 letras**.
+4. No celular: *WhatsApp → Aparelhos conectados → Conectar aparelho →
+   Conectar com número de telefone* e digite o código. Você tem cerca de 5
+   minutos.
+5. Quando aparecer "WhatsApp conectado com sucesso!", está pronto. Rode o
+   workflow de novo, **sem** marcar parear, para testar o envio.
+
+Se um dia o WhatsApp desconectar (por exemplo, se você remover o aparelho no
+celular), basta repetir os passos 2 a 4.
 
 ## Como personalizar (arquivo `bot.py`)
 
@@ -40,13 +46,13 @@ Para ver a mensagem no seu computador sem enviar nada:
 
 ```bash
 pip install -r requirements.txt
-DRY_RUN=1 python bot.py
+python bot.py
 ```
 
-## Cuidados
+## Como funciona
 
-- Envie só para quem **pediu para receber**. Durante o período eleitoral, a
-  legislação (Resolução TSE nº 23.610/2019) proíbe o disparo em massa de
-  mensagens sem consentimento, e o WhatsApp também pode bloquear o número.
-- O sandbox da Twilio serve para testes. Para usar de forma definitiva, é
-  preciso registrar um número próprio na Twilio, e o envio passa a ser pago.
+- `bot.py` busca as notícias e grava a mensagem em `mensagem.txt`.
+- `whatsapp.js` conecta ao seu WhatsApp (biblioteca Baileys) e envia a mensagem.
+- A sessão do WhatsApp fica guardada no cache do GitHub Actions,
+  criptografada com `SESSAO_SENHA`. O cache expira se o bot ficar mais de 7
+  dias sem rodar; nesse caso, pareie de novo.

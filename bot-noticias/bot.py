@@ -1,13 +1,8 @@
-"""Bot que envia, todo dia, notícias sobre a eleição para o WhatsApp.
+"""Busca, todo dia, notícias sobre a eleição e monta a mensagem do WhatsApp.
 
-Busca as notícias nos feeds RSS das fontes escolhidas, filtra pelas
-palavras-chave, monta uma mensagem e envia pela Twilio.
-
-Variáveis de ambiente:
-  TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN  credenciais da Twilio
-  TWILIO_WHATSAPP_FROM                   número remetente (ex.: whatsapp:+14155238886)
-  DESTINATARIOS                          números separados por vírgula (ex.: +5511999999999,+5521988888888)
-  DRY_RUN=1                              só mostra a mensagem, sem enviar
+Lê os feeds RSS das fontes escolhidas, filtra pelas palavras-chave e grava a
+mensagem em MENSAGEM_ARQUIVO (padrão: mensagem.txt). O envio é feito pelo
+whatsapp.js, a partir do seu próprio número.
 """
 
 import os
@@ -111,23 +106,6 @@ def montar_mensagem(noticias):
     return "\n\n".join(linhas)
 
 
-def enviar(mensagem):
-    from twilio.rest import Client
-
-    client = Client(os.environ["TWILIO_ACCOUNT_SID"], os.environ["TWILIO_AUTH_TOKEN"])
-    remetente = (os.environ.get("TWILIO_WHATSAPP_FROM") or "whatsapp:+14155238886").replace(" ", "")
-    if not remetente.startswith("whatsapp:"):
-        remetente = f"whatsapp:{remetente}"
-    destinatarios = [n.strip() for n in os.environ["DESTINATARIOS"].split(",") if n.strip()]
-
-    for numero in destinatarios:
-        numero = numero.replace(" ", "").replace("-", "")
-        if not numero.startswith("whatsapp:"):
-            numero = f"whatsapp:{numero}"
-        msg = client.messages.create(from_=remetente, to=numero, body=mensagem[:1600])
-        print(f"Enviado para {numero} (id {msg.sid})")
-
-
 def main():
     noticias = buscar_noticias()
     if len(noticias) < MINIMO:
@@ -136,10 +114,9 @@ def main():
     mensagem = montar_mensagem(noticias)
     print(mensagem)
 
-    if os.environ.get("DRY_RUN") == "1":
-        print("\n(DRY_RUN: mensagem não enviada)")
-        return
-    enviar(mensagem)
+    arquivo = os.environ.get("MENSAGEM_ARQUIVO", "mensagem.txt")
+    with open(arquivo, "w", encoding="utf-8") as f:
+        f.write(mensagem)
 
 
 if __name__ == "__main__":
