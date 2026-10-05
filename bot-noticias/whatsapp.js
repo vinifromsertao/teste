@@ -20,7 +20,7 @@ import qrcode from "qrcode-terminal";
 
 const SESSAO_DIR = process.env.SESSAO_DIR || "sessao";
 const PAREAR = process.env.PAREAR === "1";
-const LIMITE_MS = (PAREAR ? 5 : 2) * 60 * 1000;
+const LIMITE_MS = (PAREAR ? 12 : 2) * 60 * 1000;
 
 const soDigitos = (n) => (n || "").replace(/\D/g, "");
 
@@ -54,7 +54,16 @@ async function enviarNoticias(sock) {
   sair(falhas ? 1 : 0);
 }
 
+// Apaga uma sessão de pareamento que não chegou a ser concluída.
+function limparSessaoIncompleta() {
+  const arquivo = `${SESSAO_DIR}/creds.json`;
+  if (!fs.existsSync(arquivo)) return;
+  const creds = JSON.parse(fs.readFileSync(arquivo, "utf8"));
+  if (!creds.me) fs.rmSync(SESSAO_DIR, { recursive: true, force: true });
+}
+
 async function conectar() {
+  if (PAREAR) limparSessaoIncompleta();
   const { state, saveCreds } = await useMultiFileAuthState(SESSAO_DIR);
   if (!PAREAR && !state.creds.registered) {
     return sair(1, "Erro: o WhatsApp ainda não foi conectado. Rode o workflow com a opção 'parear'.");
@@ -78,15 +87,17 @@ async function conectar() {
       const numero = soDigitos(process.env.WHATSAPP_NUMERO);
       if (numero) {
         const codigo = await sock.requestPairingCode(numero);
+        const hora = new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" });
         console.log("\n==============================================");
         console.log(`   CÓDIGO PARA CONECTAR:  ${codigo.slice(0, 4)}-${codigo.slice(4)}`);
+        console.log(`   (gerado às ${hora}; vale cerca de 2 minutos)`);
         console.log("==============================================");
         console.log("No celular: WhatsApp > Aparelhos conectados > Conectar aparelho >");
         console.log("'Conectar com número de telefone' e digite o código acima.\n");
       }
     }
-    if (qr && PAREAR) {
-      console.log("Ou escaneie este QR code com o WhatsApp (Aparelhos conectados):");
+    if (qr && PAREAR && !process.env.WHATSAPP_NUMERO) {
+      console.log("Escaneie este QR code com o WhatsApp (Aparelhos conectados):");
       qrcode.generate(qr, { small: true });
     }
 
@@ -97,6 +108,12 @@ async function conectar() {
 
     if (connection === "close") {
       const status = lastDisconnect?.error?.output?.statusCode;
+      if (PAREAR && !state.creds.me) {
+        // O código expirou sem ser usado: gera um novo.
+        console.log("O código expirou. Gerando um código novo...");
+        await delay(1000);
+        return conectar();
+      }
       if (status === DisconnectReason.loggedOut) {
         return sair(1, "Erro: o WhatsApp desconectou este aparelho. Rode o workflow com a opção 'parear' de novo.");
       }

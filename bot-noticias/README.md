@@ -25,8 +25,9 @@ WhatsApp**, conectado como "aparelho vinculado" (igual ao WhatsApp Web).
 3. Abra a execução que começou e clique em **enviar → Conectar ao WhatsApp /
    enviar**. Aparece um **código de 8 letras**.
 4. No celular: *WhatsApp → Aparelhos conectados → Conectar aparelho →
-   Conectar com número de telefone* e digite o código. Você tem cerca de 5
-   minutos.
+   Conectar com número de telefone* e digite o código. Cada código vale
+   cerca de 2 minutos; se expirar, o bot mostra um novo logo abaixo (por
+   até 12 minutos).
 5. Quando aparecer "WhatsApp conectado com sucesso!", está pronto. Rode o
    workflow de novo, **sem** marcar parear, para testar o envio.
 
