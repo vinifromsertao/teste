@@ -54,18 +54,22 @@ async function enviarNoticias(sock) {
   sair(falhas ? 1 : 0);
 }
 
+// "account" só é gravado quando o celular confirma o pareamento
+// ("me" já aparece assim que o código é pedido).
+const pareado = (creds) => Boolean(creds.account);
+
 // Apaga uma sessão de pareamento que não chegou a ser concluída.
 function limparSessaoIncompleta() {
   const arquivo = `${SESSAO_DIR}/creds.json`;
   if (!fs.existsSync(arquivo)) return;
   const creds = JSON.parse(fs.readFileSync(arquivo, "utf8"));
-  if (!creds.me) fs.rmSync(SESSAO_DIR, { recursive: true, force: true });
+  if (!pareado(creds)) fs.rmSync(SESSAO_DIR, { recursive: true, force: true });
 }
 
 async function conectar() {
   if (PAREAR) limparSessaoIncompleta();
   const { state, saveCreds } = await useMultiFileAuthState(SESSAO_DIR);
-  if (!PAREAR && !state.creds.registered) {
+  if (!PAREAR && !pareado(state.creds)) {
     return sair(1, "Erro: o WhatsApp ainda não foi conectado. Rode o workflow com a opção 'parear'.");
   }
 
@@ -108,7 +112,7 @@ async function conectar() {
 
     if (connection === "close") {
       const status = lastDisconnect?.error?.output?.statusCode;
-      if (PAREAR && !state.creds.me) {
+      if (PAREAR && !pareado(state.creds)) {
         // O código expirou sem ser usado: gera um novo.
         console.log("O código expirou. Gerando um código novo...");
         await delay(1000);
