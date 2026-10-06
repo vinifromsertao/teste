@@ -19,6 +19,15 @@ import makeWASocket, {
 import pino from "pino";
 import qrcode from "qrcode-terminal";
 
+// O registro do GitHub Actions é público. A biblioteca de criptografia do
+// WhatsApp (libsignal) imprime chaves de sessão com console.info/warn, então
+// todo console.* é silenciado e o bot escreve só as próprias mensagens.
+const avisar = (texto) => process.stdout.write(`${texto}\n`);
+const alertar = (texto) => process.stderr.write(`${texto}\n`);
+for (const metodo of ["log", "info", "warn", "error", "debug", "trace", "dir"]) {
+  console[metodo] = () => {};
+}
+
 const SESSAO_DIR = process.env.SESSAO_DIR || "sessao";
 const PAREAR = process.env.PAREAR === "1";
 const LIMITE_MS = (PAREAR ? 12 : 2) * 60 * 1000;
@@ -26,7 +35,7 @@ const LIMITE_MS = (PAREAR ? 12 : 2) * 60 * 1000;
 const soDigitos = (n) => (n || "").replace(/\D/g, "");
 
 function sair(codigo, texto) {
-  if (texto) (codigo ? console.error : console.log)(texto);
+  if (texto) (codigo ? alertar : avisar)(texto);
   // Dá tempo para a sessão ser gravada no disco antes de encerrar.
   setTimeout(() => process.exit(codigo), 3000);
 }
@@ -40,7 +49,7 @@ async function enviarNoticia(sock, jid, noticia) {
       await sock.sendMessage(jid, { image: { url: noticia.imagem }, caption: legenda });
       return;
     } catch (e) {
-      console.error(`Não foi possível enviar a foto (${e.message}); enviando só o texto.`);
+      alertar(`Não foi possível enviar a foto (${e.message}); enviando só o texto.`);
     }
   }
   await sock.sendMessage(jid, { text: legenda });
@@ -59,7 +68,7 @@ async function enviarNoticias(sock) {
     // Confere o número no WhatsApp (resolve, por exemplo, o nono dígito).
     const [contato] = await sock.onWhatsApp(numero);
     if (!contato?.exists) {
-      console.error(`Destinatário ${i + 1}: número não encontrado no WhatsApp.`);
+      alertar(`Destinatário ${i + 1}: número não encontrado no WhatsApp.`);
       falhas++;
       continue;
     }
@@ -67,7 +76,7 @@ async function enviarNoticias(sock) {
       await enviarNoticia(sock, contato.jid, noticia);
       await delay(3000);
     }
-    console.log(`Destinatário ${i + 1}: ${noticias.length} notícia(s) enviada(s).`);
+    avisar(`Destinatário ${i + 1}: ${noticias.length} notícia(s) enviada(s).`);
   }
   sair(falhas ? 1 : 0);
 }
@@ -110,17 +119,17 @@ async function conectar() {
       if (numero) {
         const codigo = await sock.requestPairingCode(numero);
         const hora = new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" });
-        console.log("\n==============================================");
-        console.log(`   CÓDIGO PARA CONECTAR:  ${codigo.slice(0, 4)}-${codigo.slice(4)}`);
-        console.log(`   (gerado às ${hora}; vale cerca de 2 minutos)`);
-        console.log("==============================================");
-        console.log("No celular: WhatsApp > Aparelhos conectados > Conectar aparelho >");
-        console.log("'Conectar com número de telefone' e digite o código acima.\n");
+        avisar("\n==============================================");
+        avisar(`   CÓDIGO PARA CONECTAR:  ${codigo.slice(0, 4)}-${codigo.slice(4)}`);
+        avisar(`   (gerado às ${hora}; vale cerca de 2 minutos)`);
+        avisar("==============================================");
+        avisar("No celular: WhatsApp > Aparelhos conectados > Conectar aparelho >");
+        avisar("'Conectar com número de telefone' e digite o código acima.\n");
       }
     }
     if (qr && PAREAR && !process.env.WHATSAPP_NUMERO) {
-      console.log("Escaneie este QR code com o WhatsApp (Aparelhos conectados):");
-      qrcode.generate(qr, { small: true });
+      avisar("Escaneie este QR code com o WhatsApp (Aparelhos conectados):");
+      qrcode.generate(qr, { small: true }, avisar);
     }
 
     if (connection === "open") {
@@ -132,7 +141,7 @@ async function conectar() {
       const status = lastDisconnect?.error?.output?.statusCode;
       if (PAREAR && !pareado(state.creds)) {
         // O código expirou sem ser usado: gera um novo.
-        console.log("O código expirou. Gerando um código novo...");
+        avisar("O código expirou. Gerando um código novo...");
         await delay(1000);
         return conectar();
       }
@@ -140,7 +149,7 @@ async function conectar() {
         return sair(1, "Erro: o WhatsApp desconectou este aparelho. Rode o workflow com a opção 'parear' de novo.");
       }
       // Logo após o pareamento o WhatsApp pede para reconectar (código 515).
-      console.log(`Conexão fechada (código ${status ?? "?"}); reconectando...`);
+      avisar(`Conexão fechada (código ${status ?? "?"}); reconectando...`);
       await delay(2000);
       conectar();
     }
