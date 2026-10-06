@@ -1,17 +1,22 @@
-"""Busca, todo dia, notícias sobre a eleição e monta a mensagem do WhatsApp.
+"""Busca, todo dia, notícias sobre a eleição para enviar no WhatsApp.
 
-Lê os feeds RSS das fontes escolhidas, filtra pelas palavras-chave e grava a
-mensagem em MENSAGEM_ARQUIVO (padrão: mensagem.txt). O envio é feito pelo
-whatsapp.js, a partir do seu próprio número.
+Lê os feeds RSS das fontes escolhidas, filtra pelas palavras-chave, descobre a
+foto de cada manchete e grava a lista em NOTICIAS_ARQUIVO (padrão:
+noticias.json). O envio é feito pelo whatsapp.js: uma mensagem por notícia,
+com a foto, o título e o link.
 """
 
+import html
+import html.entities
+import json
 import os
 import re
 import sys
 import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
+from urllib.request import Request, urlopen
 
 import feedparser
 
@@ -39,10 +44,87 @@ PRIORIDADE = ["flavio bolsonaro", "lula"]
 PALAVRAS_CHAVE = PRIORIDADE + ["eleicao", "eleicoes", "eleitoral", "candidato", "pesquisa", "tse", "urna"]
 
 MINIMO = 2
-MAXIMO = 4
+MAXIMO = 2
 JANELA_HORAS = 36  # só notícias publicadas nesse intervalo
 
+NAVEGADOR = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+
 # ---------------------------------------------------------------- busca e filtro
+
+
+def baixar(url):
+    with urlopen(Request(url, headers={"User-Agent": NAVEGADOR}), timeout=20) as resposta:
+        return resposta.read().decode("utf-8", "replace")
+
+
+def corrigir_entidades(xml):
+    """Troca entidades de HTML (ex.: &nbsp;) que quebram a leitura do RSS."""
+    def trocar(m):
+        nome = m.group(1)
+        if nome in ("amp", "lt", "gt", "quot", "apos"):
+            return m.group(0)
+        codigo = html.entities.name2codepoint.get(nome)
+        return f"&#{codigo};" if codigo else ""
+
+    return re.sub(r"&([A-Za-z][A-Za-z0-9]*);", trocar, xml)
+
+
+def ler_feed(url):
+    try:
+        return feedparser.parse(corrigir_entidades(baixar(url)))
+    except Exception as erro:  # noqa: BLE001 - qualquer falha só pula o feed
+        print(f"Aviso: não foi possível ler {url} ({erro})", file=sys.stderr)
+        return None
+
+
+def do_google(link):
+    return urlparse(link).netloc.endswith("news.google.com")
+
+
+def imagem_do_item(item):
+    """Foto que o próprio RSS informa (media:content, thumbnail ou anexo)."""
+    for campo in ("media_content", "media_thumbnail"):
+        for midia in item.get(campo) or []:
+            if midia.get("url"):
+                return midia["url"]
+    for anexo in item.get("enclosures") or []:
+        if anexo.get("type", "").startswith("image") and anexo.get("href"):
+            return anexo["href"]
+    return None
+
+
+def imagem_da_pagina(link):
+    """Foto de destaque da notícia (og:image), a mesma que aparece ao compartilhar."""
+    try:
+        pagina = baixar(link)
+    except Exception:  # noqa: BLE001
+        return None
+    for padrao in (
+        r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+    ):
+        achado = re.search(padrao, pagina, re.I)
+        if achado:
+            return html.unescape(achado.group(1))
+    return None
+
+
+def resolver_pelo_site(titulo, fonte):
+    """Acha o link direto e a foto de uma notícia do Google News pela busca do site (WordPress)."""
+    dominio = SITES[fonte]
+    url = (
+        f"https://www.{dominio}/wp-json/wp/v2/posts?per_page=5&_fields=link,title,jetpack_featured_media_url"
+        f"&search={quote_plus(titulo)}"
+    )
+    try:
+        posts = json.loads(baixar(url))
+    except Exception:  # noqa: BLE001
+        return None, None
+    alvo = normalizar(titulo)
+    for post in posts:
+        if normalizar(html.unescape(post.get("title", {}).get("rendered", ""))) == alvo:
+            return post.get("link"), post.get("jetpack_featured_media_url") or None
+    return None, None
 
 
 def normalizar(texto):
@@ -69,9 +151,10 @@ def buscar_noticias():
     noticias = {}
 
     for fonte, url in FEEDS:
-        feed = feedparser.parse(url, agent="Mozilla/5.0 (bot-noticias)")
-        if feed.bozo and not feed.entries:
-            print(f"Aviso: não foi possível ler {url} ({feed.get('bozo_exception')})", file=sys.stderr)
+        feed = ler_feed(url)
+        if not feed or (feed.bozo and not feed.entries):
+            if feed is not None:
+                print(f"Aviso: não foi possível ler {url} ({feed.get('bozo_exception')})", file=sys.stderr)
             continue
 
         for item in feed.entries:
@@ -79,31 +162,38 @@ def buscar_noticias():
             if data and datetime.fromtimestamp(time.mktime(data), timezone.utc) < limite:
                 continue
 
-            titulo = limpar_titulo(item.get("title", ""), fonte)
+            titulo = html.unescape(limpar_titulo(item.get("title", ""), fonte))
             pontos = pontuacao(titulo + " " + item.get("summary", ""))
             if not pontos:
                 continue
 
+            link = item.get("link", "")
+            # Entre notícias iguais, prefere a do feed do próprio site (link direto).
+            pontos += 0 if do_google(link) else 0.5
             chave = normalizar(titulo)
             if chave not in noticias or pontos > noticias[chave]["pontos"]:
-                noticias[chave] = {"titulo": titulo, "link": item.get("link", ""), "fonte": fonte, "pontos": pontos}
+                noticias[chave] = {
+                    "titulo": titulo,
+                    "link": link,
+                    "fonte": fonte,
+                    "imagem": imagem_do_item(item),
+                    "pontos": pontos,
+                }
 
-    selecionadas = sorted(noticias.values(), key=lambda n: n["pontos"], reverse=True)
-    return selecionadas[:MAXIMO]
+    selecionadas = sorted(noticias.values(), key=lambda n: n["pontos"], reverse=True)[:MAXIMO]
+
+    for n in selecionadas:
+        if do_google(n["link"]):
+            link, imagem = resolver_pelo_site(n["titulo"], n["fonte"])
+            if link:
+                n["link"], n["imagem"] = link, imagem or n["imagem"]
+        if not n["imagem"] and not do_google(n["link"]):
+            n["imagem"] = imagem_da_pagina(n["link"])
+        del n["pontos"]
+    return selecionadas
 
 
-# ---------------------------------------------------------------- mensagem e envio
-
-
-def montar_mensagem(noticias):
-    hoje = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y")
-    if not noticias:
-        return f"🗳️ *Eleições 2026 — {hoje}*\n\nNenhuma notícia nova encontrada nas fontes hoje."
-
-    linhas = [f"🗳️ *Eleições 2026 — notícias de {hoje}*"]
-    for i, n in enumerate(noticias, 1):
-        linhas.append(f"*{i}. {n['titulo']}*\n_{n['fonte']}_\n{n['link']}")
-    return "\n\n".join(linhas)
+# ---------------------------------------------------------------- saída
 
 
 def main():
@@ -111,13 +201,12 @@ def main():
     if len(noticias) < MINIMO:
         print(f"Aviso: só {len(noticias)} notícia(s) encontrada(s).", file=sys.stderr)
 
-    mensagem = montar_mensagem(noticias)
-    print(mensagem)
+    for n in noticias:
+        print(f"- {n['titulo']}\n  {n['link']}\n  foto: {n['imagem'] or '(sem foto)'}")
 
-    arquivo = os.environ.get("MENSAGEM_ARQUIVO", "mensagem.txt")
+    arquivo = os.environ.get("NOTICIAS_ARQUIVO", "noticias.json")
     with open(arquivo, "w", encoding="utf-8") as f:
-        f.write(mensagem)
-
+        json.dump(noticias, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     main()
