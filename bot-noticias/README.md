@@ -2,8 +2,8 @@
 
 Todo dia, por volta das 7h (horário de Brasília), o bot busca notícias sobre a
 eleição na **Carta Capital** e na **Mídia Ninja**. Ele dá prioridade às que
-citam Flávio Bolsonaro e Lula e envia de 2 a 4 delas **do seu próprio
-WhatsApp**, conectado como "aparelho vinculado" (igual ao WhatsApp Web).
+citam Flávio Bolsonaro e Lula e envia 2 delas **do seu próprio WhatsApp**,
+uma mensagem por notícia (foto da manchete, título e link), conectado como "aparelho vinculado" (igual ao WhatsApp Web).
 
 > ⚠️ Esse tipo de conexão não é oficial e viola os termos de uso do WhatsApp.
 > O número pode ser bloqueado, principalmente se enviar para muitas pessoas.
@@ -43,7 +43,8 @@ celular), basta repetir os passos 2 a 4.
 - **Horário:** mude a linha `cron` em `.github/workflows/bot-noticias.yml`. O
   horário é em UTC, ou seja, Brasília + 3 horas.
 
-Para ver a mensagem no seu computador sem enviar nada:
+Para ver as notícias escolhidas sem enviar nada, rode o workflow marcando
+**so_buscar**, ou no seu computador:
 
 ```bash
 pip install -r requirements.txt
@@ -52,8 +53,10 @@ python bot.py
 
 ## Como funciona
 
-- `bot.py` busca as notícias e grava a mensagem em `mensagem.txt`.
-- `whatsapp.js` conecta ao seu WhatsApp (biblioteca Baileys) e envia a mensagem.
+- `bot.py` busca as notícias, descobre a foto de cada uma e grava a lista em
+  `noticias.json`.
+- `whatsapp.js` conecta ao seu WhatsApp (biblioteca Baileys) e envia cada
+  notícia como uma foto com legenda.
 - A sessão do WhatsApp fica guardada no cache do GitHub Actions,
   criptografada com `SESSAO_SENHA`. O cache expira se o bot ficar mais de 7
   dias sem rodar; nesse caso, pareie de novo.

@@ -14,6 +14,10 @@ on:
       numero:
         description: "Seu número com DDI e DDD, só para parear (ex.: 5516999999999)"
         required: false
+      so_buscar:
+        description: "Só buscar as notícias, sem enviar (para testar)"
+        type: boolean
+        default: false
 
 concurrency:
   group: bot-noticias
@@ -69,6 +73,7 @@ jobs:
         run: python bot.py
 
       - name: Conectar ao WhatsApp / enviar
+        if: ${{ !inputs.so_buscar }}
         run: node whatsapp.js
         env:
           PAREAR: ${{ inputs.parear && '1' || '0' }}

@@ -1,9 +1,10 @@
-// Envia a mensagem de notícias pelo seu próprio WhatsApp, conectado como
+// Envia as notícias pelo seu próprio WhatsApp, conectado como
 // "aparelho vinculado" (igual ao WhatsApp Web).
 //
 // Modos:
 //   PAREAR=1 WHATSAPP_NUMERO=5516...   conecta o WhatsApp pela primeira vez
-//   (padrão)                           envia o conteúdo de MENSAGEM_ARQUIVO para DESTINATARIOS
+//   (padrão)                           envia as notícias de NOTICIAS_ARQUIVO para DESTINATARIOS,
+//                                      uma mensagem por notícia (foto + título + link)
 //
 // A sessão fica na pasta SESSAO_DIR (padrão: sessao/).
 
@@ -32,9 +33,24 @@ function sair(codigo, texto) {
 
 setTimeout(() => sair(1, "Erro: tempo esgotado sem conseguir concluir."), LIMITE_MS);
 
+async function enviarNoticia(sock, jid, noticia) {
+  const legenda = `*${noticia.titulo}*\n\n${noticia.link}`;
+  if (noticia.imagem) {
+    try {
+      await sock.sendMessage(jid, { image: { url: noticia.imagem }, caption: legenda });
+      return;
+    } catch (e) {
+      console.error(`Não foi possível enviar a foto (${e.message}); enviando só o texto.`);
+    }
+  }
+  await sock.sendMessage(jid, { text: legenda });
+}
+
 async function enviarNoticias(sock) {
-  const arquivo = process.env.MENSAGEM_ARQUIVO || "mensagem.txt";
-  const mensagem = fs.readFileSync(arquivo, "utf8").trim();
+  const arquivo = process.env.NOTICIAS_ARQUIVO || "noticias.json";
+  const noticias = JSON.parse(fs.readFileSync(arquivo, "utf8"));
+  if (!noticias.length) return sair(0, "Nenhuma notícia nova hoje; nada foi enviado.");
+
   const destinatarios = (process.env.DESTINATARIOS || "").split(",").map(soDigitos).filter(Boolean);
   if (!destinatarios.length) return sair(1, "Erro: DESTINATARIOS está vazio.");
 
@@ -47,9 +63,11 @@ async function enviarNoticias(sock) {
       falhas++;
       continue;
     }
-    await sock.sendMessage(contato.jid, { text: mensagem });
-    console.log(`Destinatário ${i + 1}: mensagem enviada.`);
-    await delay(2000);
+    for (const noticia of noticias) {
+      await enviarNoticia(sock, contato.jid, noticia);
+      await delay(3000);
+    }
+    console.log(`Destinatário ${i + 1}: ${noticias.length} notícia(s) enviada(s).`);
   }
   sair(falhas ? 1 : 0);
 }
